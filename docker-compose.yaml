@@ -1,0 +1,53 @@
+version: '3.8'
+services:
+  cassandra:
+    image: cassandra:latest
+    container_name: cassandra-node
+    ports:
+      - "9042:9042"
+    volumes:
+      - cassandra_data:/var/lib/cassandra
+    networks:
+      - my_network
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  master_node:
+    build: ./master_node
+    container_name: master-node
+    ports:
+      - "5000:5000"
+    environment:
+      - CASSANDRA_HOST=cassandra-node
+    volumes:
+      - ./master_node:/app 
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    networks:
+      - my_network
+
+  worker-node:
+    build: ./worker_node
+    container_name: worker-node
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    networks:
+      - my_network
+    environment:
+      - CASSANDRA_HOST=cassandra-node  # Use cassandra-node consistently across services
+    volumes:
+      - ./worker_node:/app 
+
+volumes:
+  cassandra_data:
+
+networks:
+  my_network:
+    driver: bridge

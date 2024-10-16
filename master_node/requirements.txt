@@ -1,0 +1,5 @@
+fastapi==0.78.0
+uvicorn==0.17.0
+cassandra-driver==3.25.0
+requests==2.26.0
+numpy==1.21.2
