@@ -1,5 +1,47 @@
 version: '3.8'
 services:
+  zookeeper:
+    image: wurstmeister/zookeeper:latest
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    networks:
+      - my_network
+
+  kafka:
+    image: wurstmeister/kafka:latest
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks:
+      - my_network
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kafdrop:
+    image: obsidiandynamics/kafdrop:latest
+    container_name: kafdrop
+    ports:
+      - "9000:9000"
+    environment:
+      KAFKA_BROKER_CONNECT: kafka:9092
+    networks:
+      - my_network
+    depends_on:
+      - kafka
+
   cassandra:
     image: cassandra:latest
     container_name: cassandra-node
@@ -22,18 +64,23 @@ services:
       - "5000:5000"
     environment:
       - CASSANDRA_HOST=cassandra-node
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     volumes:
-      - ./master_node:/app 
+      - ./master_node:/app
     depends_on:
+      kafka:
+        condition: service_healthy
       cassandra:
         condition: service_healthy
     networks:
       - my_network
 
-  worker-node:
+  worker_node:
     build: ./worker_node
     container_name: worker-node
     depends_on:
+      kafka:
+        condition: service_healthy
       cassandra:
         condition: service_healthy
     ports:
@@ -41,9 +88,24 @@ services:
     networks:
       - my_network
     environment:
-      - CASSANDRA_HOST=cassandra-node  # Use cassandra-node consistently across services
+      - CASSANDRA_HOST=cassandra-node
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     volumes:
-      - ./worker_node:/app 
+      - ./worker_node:/app
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "3000:80"  
+    networks:
+      - my_network
+    depends_on:
+      - master_node 
+    restart: always
+    volumes:
+      - ./frontend:/usr/src/app
+
 
 volumes:
   cassandra_data:

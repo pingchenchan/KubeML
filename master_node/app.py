@@ -1,13 +1,66 @@
 from fastapi import FastAPI, WebSocket, HTTPException
 from cassandra.cluster import Cluster
 from cassandra.query import BatchStatement, SimpleStatement
-import requests
+from tensorflow.keras.datasets import mnist
+from tensorflow.keras.utils import to_categorical
+import json
 import numpy as np
-from io import StringIO
+from kafka import KafkaProducer,KafkaConsumer
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import uuid
 
 app = FastAPI()
+
+# Kafka configuration
+KAFKA_SERVER = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER,
+                         value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+
+
+app = FastAPI()
+
+# Add CORS middleware to allow communication with frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # You can restrict this to specific origins later
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+
+@app.get("/test-producer")
+async def test_producer():
+    test_message = {"task_type": "mlp", "data": "Hello from Master"}
+    producer.send('test-topic', test_message)
+    return {"status": "Message sent", "message": test_message}
+
+@app.post("/send_task/{task_type}")
+async def send_task(task_type: str):
+    if task_type not in ["mlp", "lstm", "cnn"]:
+        raise HTTPException(status_code=400, detail="Invalid task type")
+
+    # Prepare task message
+    task_message = {"task_type": task_type}
+    producer.send(task_type, task_message)
+
+    return {"message": f"Task {task_type} sent to Kafka"}
+
+@app.get("/results")
+async def get_results():
+    consumer = KafkaConsumer('training-results',
+                             bootstrap_servers=KAFKA_SERVER,
+                             value_deserializer=lambda m: json.loads(m.decode('utf-8')))
+    
+    results = []
+    for message in consumer:
+        result = message.value
+        results.append(result)
+        print(f"Received result: {result}")
+
+    return {"results": results}
 
 # Connect to Cassandra during application startup
 cassandra_host = os.getenv('CASSANDRA_HOST', 'localhost')
@@ -47,107 +100,87 @@ async def health_check():
         print(f"Health check failed: {e}")
         return {"status": "FastAPI is running", "db_status": "Cassandra connection failed"}
 
-# Function to download the NYC housing dataset
-def download_data():
-    url = 'https://ics.uci.edu/~ihler/classes/cs273/data/nyc_housing.txt'
+# **Function to download and preprocess MNIST dataset**
+def download_and_preprocess_mnist():
+    (X_train, y_train), (X_test, y_test) = mnist.load_data()
 
+    # Normalize pixel values to the range [0, 1]
+    X_train = X_train.astype('float32') / 255
+    X_test = X_test.astype('float32') / 255
+
+    # One-hot encode labels
+    y_train = to_categorical(y_train, 10)
+    y_test = to_categorical(y_test, 10)
+
+    return X_train, y_train, X_test, y_test
+
+# Store data in batches using a PreparedStatement
+# Store data using a PreparedStatement
+def insert_data(dataset_type, features, labels):
+    total_rows = features.shape[0]
+
+    for i in range(total_rows):
+        feature = features[i]
+        label = labels[i]
+        row_id = uuid.uuid4()
+
+        # Prepare and execute each insert
+        session.execute(session.prepare("""
+            INSERT INTO mnist_data (row_id, dataset_type, features, label)
+            VALUES (?, ?, ?, ?)
+        """), (row_id, dataset_type, feature.flatten().tolist(), label.tolist()))
+
+        print(f"Inserted row {i + 1} / {total_rows}")
+
+
+# **API to store MNIST data in Cassandra**
+@app.post("/store_mnist_data")
+async def store_mnist_data():
     try:
-        response = requests.get(url)
-        response.raise_for_status()  # Check if the request was successful
-
-        datafile = StringIO(response.text)
-        data = np.genfromtxt(datafile, delimiter=',', missing_values='', filling_values=np.nan)
-
-        if data is None or data.size == 0:
-            raise ValueError("Downloaded dataset is empty or could not be parsed.")
-
-        features, labels = data[:, :-1], data[:, -1]
-    except requests.RequestException as req_err:
-        print(f"Request error: {req_err}")
-        raise HTTPException(status_code=500, detail="Failed to download dataset.")
-    except Exception as parse_err:
-        print(f"Data parsing error: {parse_err}")
-        raise HTTPException(status_code=500, detail="Failed to parse dataset.")
-
-    return features, labels
-
-# Insert NYC housing data, create the table if it does not exist
-@app.post("/insert_nyc_housing")
-async def insert_nyc_housing():
-    # Create table if not exists
-    try:
+        # Create table if it doesn't exist
         session.execute("""
-            CREATE TABLE IF NOT EXISTS nyc_housing_data (
+            CREATE TABLE IF NOT EXISTS mnist_data (
                 row_id UUID PRIMARY KEY,
+                dataset_type text,
                 features list<float>,
-                label float
+                label list<float>
             );
         """)
+
+        # Download and preprocess MNIST data
+        X_train, y_train, X_test, y_test = download_and_preprocess_mnist()
+
+        # Insert both train and test datasets
+        insert_data('train', X_train, y_train)
+        insert_data('test', X_test, y_test)
+
+        return {"status": "MNIST data successfully stored in Cassandra"}
     except Exception as e:
-        print(f"Failed to create table: {e}")
-        raise HTTPException(status_code=500, detail="Failed to create table")
-
+        print(f"Failed to store MNIST data: {e}")
+        raise HTTPException(status_code=500, detail="Failed to store MNIST data")
+# **API to fetch MNIST data from Cassandra**
+@app.get("/get_mnist_data/{dataset_type}")
+async def get_mnist_data(dataset_type: str):
     try:
-        # Download the NYC housing dataset
-        features, labels = download_data()
-    except Exception as e:
-        print(f"Failed to download NYC housing data: {e}")
-        raise HTTPException(status_code=500, detail="NYC housing data download failed")
+        if dataset_type not in ['train', 'test']:
+            raise HTTPException(status_code=400, detail="Invalid dataset type. Choose 'train' or 'test'.")
 
-    try:
-        # Process the data in smaller batches to avoid the "Batch too large" error
-        batch_size = 100  # Define your batch size here
-        total_rows = len(features)
-
-        for i in range(0, total_rows, batch_size):
-            batch = BatchStatement()
-            batch_features = features[i:i + batch_size]
-            batch_labels = labels[i:i + batch_size]
-
-            for feature, label in zip(batch_features, batch_labels):
-                row_id = uuid.uuid4()
-
-                # Check if data with the same features already exists
-                existing = session.execute(SimpleStatement("""
-                    SELECT row_id FROM nyc_housing_data WHERE features = %s ALLOW FILTERING;
-                """, fetch_size=1), (feature.tolist(),))
-
-                if existing.one():
-                    print(f"Data already exists, skipping row: {feature.tolist()}")
-                    continue
-
-                # Prepare the batch insert statement
-                batch.add(session.prepare("""
-                    INSERT INTO nyc_housing_data (row_id, features, label)
-                    VALUES (?, ?, ?)
-                """), (row_id, feature.tolist(), label))
-
-            # Execute the batch
-            session.execute(batch)
-            print(f"Inserted batch {i//batch_size + 1}/{(total_rows//batch_size) + 1}")
-    except Exception as e:
-        print(f"Failed to insert NYC housing data: {e}")
-        raise HTTPException(status_code=500, detail="NYC housing data insertion failed")
-
-    return {"status": "success"}
-
-# Query NYC housing data for machine learning
-@app.get("/get_nyc_housing_data")
-async def get_nyc_housing_data():
-    try:
-        # Query all data points for machine learning
-        rows = session.execute("SELECT * FROM nyc_housing_data")
+        # Query data from Cassandra
+        rows = session.execute(f"SELECT features, label FROM mnist_data WHERE dataset_type = '{dataset_type}' ALLOW FILTERING")
 
         features = []
         labels = []
 
-        # Convert rows to feature and label arrays
+        # Collect features and labels
         for row in rows:
-            features.append(row.features)
-            labels.append(row.label)
+            features.append(np.array(row.features, dtype=np.float32).reshape(28, 28))
+            labels.append(np.array(row.label, dtype=np.float32))
 
-        return {"features": features, "labels": labels}
+        # Convert to numpy arrays
+        features = np.array(features)
+        labels = np.array(labels)
 
+        return {"features": features.tolist(), "labels": labels.tolist()}
     except Exception as e:
-        print(f"Failed to retrieve NYC housing data: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve data")
+        print(f"Failed to retrieve MNIST data: {e}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve MNIST data")
