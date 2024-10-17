@@ -4,15 +4,51 @@ import axios from 'axios';
 const App: React.FC = () => {
   const [trainingResults, setTrainingResults] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [isTraining, setIsTraining] = useState<boolean>(false); // Track if training is in progress
-  const API_BASE_URL = 'http://master-node:5000'; // Use Docker service name
+  const [isTraining, setIsTraining] = useState<boolean>(false);
+  const [logMessages, setLogMessages] = useState<string[]>([]);
+  const [trainingLogs, setTrainingLogs] = useState<string[]>([]);
 
+  const API_BASE_URL = 'http://localhost:5000';
+
+  // WebSocket 初始化，監聽 `logs` 與 `training-logs`
+  useEffect(() => {
+    const connectWebSocket = (url: string, messageHandler: (data: string) => void) => {
+      const ws = new WebSocket(url);
+
+      ws.onopen = () => console.log(`Connected to ${url}`);
+      ws.onmessage = (event) => {
+        console.log(`Received message from ${url}:`, event.data);
+        messageHandler(event.data);
+      };
+      ws.onclose = () => console.log(`WebSocket disconnected from ${url}`);
+      ws.onerror = (error) => console.error(`WebSocket error from ${url}:`, error);
+
+      return ws;
+    };
+
+    const logWs = connectWebSocket(
+      'ws://localhost:5000/ws/logs',
+      (data) => setLogMessages((prev) => [...prev, data])
+    );
+
+    const trainingLogsWs = connectWebSocket(
+      'ws://localhost:5000/ws/training-logs',
+      (data) => setTrainingLogs((prev) => [...prev, data])
+    );
+
+    return () => {
+      logWs.close();
+      trainingLogsWs.close();
+    };
+  }, []);
+
+  // 獲取訓練結果
   const fetchResults = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/results`);
       setTrainingResults(response.data.results);
       setLoading(false);
-      setIsTraining(false); // Re-enable buttons after receiving results
+      setIsTraining(false);
     } catch (error) {
       console.error('Error fetching results:', error);
       setLoading(false);
@@ -21,54 +57,79 @@ const App: React.FC = () => {
   };
 
   const pollResults = useCallback(() => {
-    const intervalId = setInterval(async () => {
-      console.log("Polling for results...");
-      await fetchResults();
-    }, 5000); // Poll every 5 seconds
-
-    return () => clearInterval(intervalId); // Clear interval when component unmounts
+    const intervalId = setInterval(fetchResults, 5000);
+    return () => clearInterval(intervalId);
   }, []);
 
-  const handleDownload = async () => {
+  const handleTask = async (
+    action: () => Promise<void>,
+    successMessage: string,
+    errorMessage: string
+  ) => {
     try {
       setLoading(true);
-      await axios.post(`${API_BASE_URL}/store_mnist_data`);
-      alert('MNIST data downloaded and stored in Cassandra.');
-      setLoading(false);
+      await action();
+      alert(successMessage);
     } catch (error) {
-      console.error('Error downloading MNIST:', error);
-      alert('Failed to download MNIST data.');
+      console.error(errorMessage, error);
+      alert(errorMessage);
+    } finally {
       setLoading(false);
     }
   };
 
-  const handleTraining = async (taskType: string) => {
-    try {
-      setLoading(true);
-      setIsTraining(true); // Disable all buttons during training
-      await axios.post(`${API_BASE_URL}/send_task/${taskType}`);
-      alert(`${taskType} training started.`);
+  const handleDownload = () =>
+    handleTask(
+      () => axios.post(`${API_BASE_URL}/store_mnist_data`),
+      'MNIST data downloaded and stored in Cassandra.',
+      'Failed to download MNIST data.'
+    );
 
-      // Start polling for results after sending the task
-      pollResults();
-    } catch (error) {
-      console.error(`Error starting ${taskType} training:`, error);
-      alert(`Failed to start ${taskType} training.`);
-      setLoading(false);
-      setIsTraining(false);
-    }
+  const handleTestProducer = () =>
+    handleTask(
+      () => axios.get(`${API_BASE_URL}/test-producer`),
+      'Test producer executed.',
+      'Failed to execute test producer.'
+    );
+
+  const handleTraining = async (taskType: string) => {
+    setIsTraining(true);
+    await handleTask(
+      () => axios.post(`${API_BASE_URL}/send_task/${taskType}`),
+      `${taskType} training started.`,
+      `Failed to start ${taskType} training.`
+    );
+    pollResults();
   };
 
   useEffect(() => {
-    fetchResults(); // Fetch initial results on component mount
+    fetchResults();
   }, []);
 
   return (
     <div className="App">
       <h1>Machine Learning Platform</h1>
-      <button onClick={handleDownload} disabled={loading || isTraining}>
-        Download MNIST Dataset
-      </button>
+
+      <section>
+        <h2>Insertion Logs</h2>
+        {logMessages.length ? (
+          <ul>
+            {logMessages.map((msg, index) => (
+              <li key={index}>{msg}</li>
+            ))}
+          </ul>
+        ) : (
+          <p>No insertion logs available.</p>
+        )}
+      </section>
+
+      <div>
+        <button onClick={handleDownload} disabled={loading || isTraining}>
+          Download MNIST Dataset
+        </button>
+        <button onClick={handleTestProducer}>Test Producer</button>
+      </div>
+
       <div>
         <button onClick={() => handleTraining('mlp')} disabled={loading || isTraining}>
           Train MLP
@@ -80,18 +141,34 @@ const App: React.FC = () => {
           Train CNN
         </button>
       </div>
-      <h2>Training Results</h2>
-      {loading ? (
-        <p>Loading...</p>
-      ) : (
-        <ul>
-          {trainingResults.map((result, index) => (
-            <li key={index}>
-              {result.task_type}: Accuracy - {result.accuracy}, Loss - {result.loss}
-            </li>
-          ))}
-        </ul>
-      )}
+
+      <section>
+        <h2>Training Logs</h2>
+        {trainingLogs.length ? (
+          <ul>
+            {trainingLogs.map((log, index) => (
+              <li key={index}>{log}</li>
+            ))}
+          </ul>
+        ) : (
+          <p>No training logs available.</p>
+        )}
+      </section>
+
+      <section>
+        <h2>Training Results</h2>
+        {loading ? (
+          <p>Loading...</p>
+        ) : (
+          <ul>
+            {trainingResults.map((result, index) => (
+              <li key={index}>
+                {result.task_type}: Accuracy - {result.accuracy}, Loss - {result.loss}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 };

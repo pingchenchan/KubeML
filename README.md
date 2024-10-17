@@ -1,4 +1,22 @@
+
 # Technical Document: Automated Machine Learning Model Selection and Training Platform Design
+
+
+## Setup
+
+
+docker-compose down --volumes --remove-orphans
+docker-compose up -d --build
+
+docker network inspect my_network
+
+
+
+docker-compose down --remove-orphans && docker-compose up --build
+
+
+docker-compose down  && docker-compose up --build -d 
+
 
 ## Overview
 This platform aims to provide users with a convenient service for selecting and training machine learning models. Users can choose example datasets and select classification tasks, and the system will automatically train suitable models and identify the best-performing one. The system uses Kubernetes to manage multiple containers, distribute model training workloads, and utilizes Redis for caching frequently accessed data to improve data retrieval efficiency.

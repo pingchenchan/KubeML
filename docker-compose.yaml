@@ -51,6 +51,9 @@ services:
       - cassandra_data:/var/lib/cassandra
     networks:
       - my_network
+    environment:
+      - MAX_HEAP_SIZE=512M          # Adjust based on available memory
+      - HEAP_NEWSIZE=100M
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
       interval: 10s
@@ -75,6 +78,19 @@ services:
     networks:
       - my_network
 
+  redis:
+    image: "redis:alpine"
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - my_network
+    healthcheck:
+        test: ["CMD", "redis-cli", "ping"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+
   worker_node:
     build: ./worker_node
     container_name: worker-node
@@ -83,6 +99,8 @@ services:
         condition: service_healthy
       cassandra:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8000:8000"
     networks:
@@ -90,6 +108,7 @@ services:
     environment:
       - CASSANDRA_HOST=cassandra-node
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
     volumes:
       - ./worker_node:/app
 
@@ -97,14 +116,14 @@ services:
     build: ./frontend
     container_name: frontend
     ports:
-      - "3000:80"  
+      - "3000:3000"
     networks:
       - my_network
     depends_on:
-      - master_node 
+      - master_node
     restart: always
-    volumes:
-      - ./frontend:/usr/src/app
+    volumes: 
+      - ./frontend:/app
 
 
 volumes:
