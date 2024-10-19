@@ -8,3 +8,4 @@ matplotlib==3.9.2
 tensorflow-cpu==2.13.0
 kafka-python==2.0.2
 redis==5.1.1
+aiokafka==0.7.2 

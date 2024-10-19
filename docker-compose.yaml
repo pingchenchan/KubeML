@@ -42,23 +42,54 @@ services:
     depends_on:
       - kafka
 
-  cassandra:
+
+  cassandra-node1:
     image: cassandra:latest
-    container_name: cassandra-node
+    container_name: cassandra-node1
     ports:
       - "9042:9042"
     volumes:
-      - cassandra_data:/var/lib/cassandra
+      - cassandra_data_node1:/var/lib/cassandra
     networks:
       - my_network
     environment:
-      - MAX_HEAP_SIZE=512M          # Adjust based on available memory
-      - HEAP_NEWSIZE=100M
+      - CASSANDRA_SEEDS=cassandra-node1,cassandra-node2
+      - CASSANDRA_CLUSTER_NAME=my_cluster
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+
+  cassandra-node2:
+    image: cassandra:latest
+    container_name: cassandra-node2
+    ports:
+      - "9142:9042"
+    volumes:
+      - cassandra_data_node2:/var/lib/cassandra
+    networks:
+      - my_network
+    environment:
+      - CASSANDRA_SEEDS=cassandra-node1,cassandra-node2
+      - CASSANDRA_CLUSTER_NAME=my_cluster
+      - CASSANDRA_DC=dc1
+      - CASSANDRA_RACK=rack1
+    depends_on:
+      cassandra-node1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+
+
+
 
   master_node:
     build: ./master_node
@@ -66,14 +97,14 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - CASSANDRA_HOST=cassandra-node
+      - CASSANDRA_HOST=cassandra-node1,cassandra-node2
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     volumes:
       - ./master_node:/app
     depends_on:
       kafka:
         condition: service_healthy
-      cassandra:
+      cassandra-node1:
         condition: service_healthy
     networks:
       - my_network
@@ -97,7 +128,7 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
-      cassandra:
+      cassandra-node1:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -106,7 +137,7 @@ services:
     networks:
       - my_network
     environment:
-      - CASSANDRA_HOST=cassandra-node
+      - CASSANDRA_HOST=cassandra-node1
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - REDIS_HOST=redis
     volumes:
@@ -125,9 +156,10 @@ services:
     volumes: 
       - ./frontend:/app
 
-
 volumes:
-  cassandra_data:
+  cassandra_data_node1:
+  cassandra_data_node2:
+
 
 networks:
   my_network:

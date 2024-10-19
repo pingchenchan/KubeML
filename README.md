@@ -11,12 +11,18 @@ docker-compose up -d --build
 docker network inspect my_network
 
 
+docker exec -it cassandra-node cqlsh
+USE my_dataset_keyspace;
+TRUNCATE mnist_data;
+SELECT COUNT(*) FROM mnist_data;
+
 
 docker-compose down --remove-orphans && docker-compose up --build
 
 
-docker-compose down  && docker-compose up --build -d 
+docker-compose down  && docker-compose up --build 
 
+docker exec -it cassandra-node1 nodetool status
 
 ## Overview
 This platform aims to provide users with a convenient service for selecting and training machine learning models. Users can choose example datasets and select classification tasks, and the system will automatically train suitable models and identify the best-performing one. The system uses Kubernetes to manage multiple containers, distribute model training workloads, and utilizes Redis for caching frequently accessed data to improve data retrieval efficiency.

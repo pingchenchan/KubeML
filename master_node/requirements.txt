@@ -5,4 +5,5 @@ requests==2.28.1
 numpy==1.23.5
 tensorflow-cpu==2.13.0 
 kafka-python==2.0.2
-wsproto
+wsproto==1.0.0  
+aiokafka==0.7.2 

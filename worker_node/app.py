@@ -4,7 +4,7 @@ import numpy as np
 import logging
 import json
 import pickle
-from kafka import KafkaConsumer, KafkaProducer
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from fastapi import FastAPI, HTTPException, Depends
 from cassandra.cluster import Cluster, Session
 from cassandra.query import SimpleStatement
@@ -29,29 +29,37 @@ app = FastAPI()
 CASSANDRA_HOST = os.getenv('CASSANDRA_HOST', 'localhost')
 KAFKA_SERVER = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
 KEYSPACE = "my_dataset_keyspace"
-# Add CORS middleware to allow communication with frontend
+
+##  Redis connection
+REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+redis_client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=False)
+
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # You can restrict this to specific origins later
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Kafka setup
-producer = KafkaProducer(
+producer = AIOKafkaProducer(
     bootstrap_servers=KAFKA_SERVER,
-    retries=5,
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
-consumer = KafkaConsumer(
-    'mlp', 'lstm', 'cnn',
-    bootstrap_servers=KAFKA_SERVER,
-    value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-    group_id="worker-node-group",
-    auto_offset_reset='earliest'
-)
+async def get_consumer():
+    consumer = AIOKafkaConsumer(
+        'mlp', 'lstm', 'cnn',
+        bootstrap_servers=KAFKA_SERVER,
+        value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+        group_id="worker-node-group",
+        auto_offset_reset='earliest'
+    )
+    await consumer.start()
+    return consumer
 
 # **Cassandra Connection**
 def get_cassandra_session() -> Session:
@@ -65,28 +73,21 @@ def get_cassandra_session() -> Session:
         logging.error(f"Cassandra connection failed: {e}")
         raise HTTPException(status_code=500, detail="Database connection failed")
     
-##  Redis connection
-REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
-redis_client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=False)
 
-
-def send_log_to_kafka(log_message: str):
-    """Helper function to send logs to the training-log Kafka topic."""
-    if isinstance(log_message, bytes):
-        log_message = base64.b64encode(log_message).decode('utf-8')
-
+async def send_log_to_kafka(log_message: str):
+    """Send logs to the Kafka topic asynchronously."""
     try:
-        producer.send('training-log', value=log_message)
+        await producer.send('training-log', log_message)
         logging.info(f'Sent log to Kafka: {log_message}')
     except Exception as e:
         logging.error(f'Failed to send log to Kafka: {e}')
     
 
 # **Train Model Function**
-def train_model(task_type: str, model: Sequential):
+async def train_model(task_type: str, model: Sequential):
     session = get_cassandra_session()
-    X_train, y_train = fetch_mnist_data(session, "train")
-    X_test, y_test = fetch_mnist_data(session, "test")
+    X_train, y_train =await fetch_mnist_data(session, "train")
+    X_test, y_test = await fetch_mnist_data(session, "test")
 
     if task_type == 'lstm':
         X_train, X_test = X_train.reshape(-1, 28, 28), X_test.reshape(-1, 28, 28)
@@ -94,40 +95,42 @@ def train_model(task_type: str, model: Sequential):
         X_train, X_test = X_train.reshape(-1, 28, 28, 1), X_test.reshape(-1, 28, 28, 1)
 
     logging.info(f"Training {task_type} model...")
-    send_log_to_kafka(f"Training {task_type} model...")
+    await send_log_to_kafka(f"Training {task_type} model...")
     model.fit(X_train, y_train, epochs=5, batch_size=128, verbose=1)
     loss, accuracy = model.evaluate(X_test, y_test)
+    
     logging.info(f"{task_type} training complete. Accuracy: {accuracy}, Loss: {loss}")
-    send_log_to_kafka(f"{task_type} training complete. Accuracy: {accuracy}, Loss: {loss}")
+    await send_log_to_kafka(f"{task_type} training complete. Accuracy: {accuracy}, Loss: {loss}")
 
     # Publish result to Kafka
     result = {"task_type": task_type, "accuracy": accuracy, "loss": loss}
-    
-    producer.send('training-results', result)
+    await producer.send_and_wait('training-results', result)
 
 # **Startup Event to Subscribe Kafka Topics**
 @app.on_event("startup")
 async def start_kafka_listener():
+    consumer = await get_consumer()
     logging.info("Kafka listener started...")
-    consumer.subscribe(['mlp', 'lstm', 'cnn'])
+    try:
+        async for message in consumer:
+            task = message.value
+            task_type = task['task_type']
+            logging.info(f"Received task: {task_type}")
 
-    while True:
-        messages = consumer.poll(timeout_ms=1000)
-        if messages:
-            for topic_partition, msgs in messages.items():
-                for msg in msgs:
-                    task = msg.value
-                    task_type = task['task_type']
-                    logging.info(f"Received task: {task_type}")
+            if task_type == 'mlp':
+                await train_model(task_type, build_mlp_model((28, 28)))
+            elif task_type == 'lstm':
+                await train_model(task_type, build_lstm_model((28, 28)))
+            elif task_type == 'cnn':
+                await train_model(task_type, build_cnn_model((28, 28, 1)))
 
-                    if task_type == 'mlp':
-                        train_model(task_type, build_mlp_model((28, 28)))
-                    elif task_type == 'lstm':
-                        train_model(task_type, build_lstm_model((28, 28)))
-                    elif task_type == 'cnn':
-                        train_model(task_type, build_cnn_model((28, 28, 1)))
+    except Exception as e:
+        logging.error(f"Kafka listener error: {e}")
+    finally:
+        await consumer.stop()
+        
 # **Fetch MNIST data from Cassandra with logging**
-def fetch_mnist_data(session: Session, dataset_type: str):
+async def fetch_mnist_data(session: Session, dataset_type: str):
     try:
         cache_key = f"mnist_data_{dataset_type}"
 
@@ -136,13 +139,13 @@ def fetch_mnist_data(session: Session, dataset_type: str):
         if cached_data:
             message = f"Fetching {dataset_type} data from Redis cache..."
             logging.info(message)
-            send_log_to_kafka(message)
+            await send_log_to_kafka(message)
             features, labels = pickle.loads(cached_data)  # Deserialize with pickle
             return np.array(features), np.array(labels)
 
         message = f"Fetching {dataset_type} data from Cassandra..."
         logging.info(message)
-        send_log_to_kafka(message)
+        await send_log_to_kafka(message)
         query = SimpleStatement(
             "SELECT features, label FROM mnist_data WHERE dataset_type = %s ALLOW FILTERING"
         )
@@ -153,22 +156,22 @@ def fetch_mnist_data(session: Session, dataset_type: str):
             features.append(np.array(row.features, dtype=np.float32).reshape(28, 28))
             labels.append(np.array(row.label, dtype=np.float32))
             if i % 1000 == 0:
-                log_message = f"Fetched {dataset_type} row {i} / {len(rows)}"
+                log_message = f"Fetched {dataset_type} row {i} from Cassandra..."
                 logging.info(log_message)
-                send_log_to_kafka(log_message)  
+                await send_log_to_kafka(log_message)  
 
         # Serialize data with pickle and store it in Redis
         redis_client.set(cache_key, pickle.dumps((features, labels)), ex=3600)
         message = f"Saved {dataset_type} data to Redis cache..."
         logging.info(message )
-        send_log_to_kafka(message)
+        await send_log_to_kafka(message)
 
         return np.array(features), np.array(labels)
 
     except Exception as e:
         error_message = f"Failed to fetch MNIST data: {e}"
         logging.error(error_message)
-        send_log_to_kafka(error_message)
+        await send_log_to_kafka(error_message)
         raise HTTPException(status_code=500, detail="Failed to fetch MNIST data")
 
 

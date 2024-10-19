@@ -1,48 +1,32 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import usePersistentWebSocket from './usePersistentWebSocket';
 
 const App: React.FC = () => {
   const [trainingResults, setTrainingResults] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [isTraining, setIsTraining] = useState<boolean>(false);
-  const [logMessages, setLogMessages] = useState<string[]>([]);
-  const [trainingLogs, setTrainingLogs] = useState<string[]>([]);
+  const [logMessages, setLogMessages] = useState<string>('');
+  const [trainingLogs, setTrainingLogs] = useState<string>('');
 
   const API_BASE_URL = 'http://localhost:5000';
 
-  // WebSocket 初始化，監聽 `logs` 與 `training-logs`
-  useEffect(() => {
-    const connectWebSocket = (url: string, messageHandler: (data: string) => void) => {
-      const ws = new WebSocket(url);
+  const handleLogMessage = (data: string) => {
+    console.log("Log message received:", data);
+    setLogMessages( data);
+  };
 
-      ws.onopen = () => console.log(`Connected to ${url}`);
-      ws.onmessage = (event) => {
-        console.log(`Received message from ${url}:`, event.data);
-        messageHandler(event.data);
-      };
-      ws.onclose = () => console.log(`WebSocket disconnected from ${url}`);
-      ws.onerror = (error) => console.error(`WebSocket error from ${url}:`, error);
+  const handleTrainingLog = (data: string) => {
+    console.log("Training log received:", data);
+    setTrainingLogs(data)
+  };
 
-      return ws;
-    };
+  usePersistentWebSocket('ws://localhost:5000/ws/logs', handleLogMessage);
+  usePersistentWebSocket('ws://localhost:5000/ws/training-logs', handleTrainingLog);
 
-    const logWs = connectWebSocket(
-      'ws://localhost:5000/ws/logs',
-      (data) => setLogMessages((prev) => [...prev, data])
-    );
 
-    const trainingLogsWs = connectWebSocket(
-      'ws://localhost:5000/ws/training-logs',
-      (data) => setTrainingLogs((prev) => [...prev, data])
-    );
 
-    return () => {
-      logWs.close();
-      trainingLogsWs.close();
-    };
-  }, []);
-
-  // 獲取訓練結果
+ 
   const fetchResults = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/results`);
@@ -112,11 +96,9 @@ const App: React.FC = () => {
 
       <section>
         <h2>Insertion Logs</h2>
-        {logMessages.length ? (
+        {logMessages? (
           <ul>
-            {logMessages.map((msg, index) => (
-              <li key={index}>{msg}</li>
-            ))}
+            {logMessages}
           </ul>
         ) : (
           <p>No insertion logs available.</p>
@@ -146,9 +128,7 @@ const App: React.FC = () => {
         <h2>Training Logs</h2>
         {trainingLogs.length ? (
           <ul>
-            {trainingLogs.map((log, index) => (
-              <li key={index}>{log}</li>
-            ))}
+            {trainingLogs}
           </ul>
         ) : (
           <p>No training logs available.</p>
