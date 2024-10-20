@@ -4,6 +4,6 @@ cassandra-driver==3.25.0
 requests==2.28.1
 numpy==1.23.5
 tensorflow-cpu==2.13.0 
-kafka-python==2.0.2
+confluent-kafka==2.6.0
 wsproto==1.0.0  
-aiokafka==0.7.2 
+redis[hiredis]==5.1.1

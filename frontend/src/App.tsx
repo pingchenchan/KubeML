@@ -1,155 +1,239 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import usePersistentWebSocket from './usePersistentWebSocket';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Container,
+  Box,
+  Button,
+  List,
+  ListItem,
+  ListItemText,
+  Paper,
+  CssBaseline,
+  Grid,
+  CircularProgress,
+  ThemeProvider,
+  IconButton,
+  Slide,
+  useScrollTrigger,
+} from '@mui/material';
+import theme from './theme';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 const App: React.FC = () => {
+  const [loadingLogs, setLoadingLogs] = useState<string[]>([]);
+  const [trainingLogs, setTrainingLogs] = useState<string[]>([]);
   const [trainingResults, setTrainingResults] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [isTraining, setIsTraining] = useState<boolean>(false);
-  const [logMessages, setLogMessages] = useState<string>('');
-  const [trainingLogs, setTrainingLogs] = useState<string>('');
+  const logsEndRef = useRef<HTMLDivElement>(null);
 
   const API_BASE_URL = 'http://localhost:5000';
 
-  const handleLogMessage = (data: string) => {
-    console.log("Log message received:", data);
-    setLogMessages( data);
-  };
+  useEffect(() => {
+    const eventSource = new EventSource(`${API_BASE_URL}/logs/stream`);
 
-  const handleTrainingLog = (data: string) => {
-    console.log("Training log received:", data);
-    setTrainingLogs(data)
-  };
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
 
-  usePersistentWebSocket('ws://localhost:5000/ws/logs', handleLogMessage);
-  usePersistentWebSocket('ws://localhost:5000/ws/training-logs', handleTrainingLog);
+      switch (data.log_type) {
+        case 'loading':
+          addLog(setLoadingLogs, data.message);
+          break;
+        case 'training':
+          const trainingMessage =
+            data.epoch !== undefined
+              ? `Epoch ${data.epoch}: Accuracy - ${data.accuracy}, Loss - ${data.loss}`
+              : data.message;
+          addLog(setTrainingLogs, trainingMessage);
+          break;
+        case 'result':
+          setTrainingResults((prevResults) => [...prevResults, data]);
+          break;
+        default:
+          console.warn('Unknown log type:', data.log_type);
+      }
+    };
 
+    eventSource.onerror = (error) => {
+      console.error('SSE connection error:', error);
+      eventSource.close();
+    };
 
-
- 
-  const fetchResults = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/results`);
-      setTrainingResults(response.data.results);
-      setLoading(false);
-      setIsTraining(false);
-    } catch (error) {
-      console.error('Error fetching results:', error);
-      setLoading(false);
-      setIsTraining(false);
-    }
-  };
-
-  const pollResults = useCallback(() => {
-    const intervalId = setInterval(fetchResults, 5000);
-    return () => clearInterval(intervalId);
+    return () => {
+      eventSource.close();
+    };
   }, []);
 
-  const handleTask = async (
-    action: () => Promise<void>,
-    successMessage: string,
-    errorMessage: string
+  const addLog = (
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    message: string
   ) => {
+    setter((prevLogs) => {
+      const newLogs = [...prevLogs, message];
+      if (newLogs.length > 100) newLogs.shift();
+      return newLogs;
+    });
+
+    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleDownload = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      await action();
-      alert(successMessage);
+      await axios.post(`${API_BASE_URL}/store_mnist_dataset_to_cassandra`);
+      alert('MNIST data downloaded and stored in Cassandra.');
     } catch (error) {
-      console.error(errorMessage, error);
-      alert(errorMessage);
+      console.error('Failed to download MNIST data.', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDownload = () =>
-    handleTask(
-      () => axios.post(`${API_BASE_URL}/store_mnist_data`),
-      'MNIST data downloaded and stored in Cassandra.',
-      'Failed to download MNIST data.'
-    );
-
-  const handleTestProducer = () =>
-    handleTask(
-      () => axios.get(`${API_BASE_URL}/test-producer`),
-      'Test producer executed.',
-      'Failed to execute test producer.'
-    );
+  const handleRedis = async () => {
+    setLoading(true);
+    try {
+      await axios.get(`${API_BASE_URL}/store_data_from_cassandra_to_redis`);
+      alert('Data loaded into Redis successfully.');
+    } catch (error) {
+      console.error('Failed to load data into Redis.', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleTraining = async (taskType: string) => {
     setIsTraining(true);
-    await handleTask(
-      () => axios.post(`${API_BASE_URL}/send_task/${taskType}`),
-      `${taskType} training started.`,
-      `Failed to start ${taskType} training.`
-    );
-    pollResults();
+    try {
+      await axios.post(`${API_BASE_URL}/send_task/${taskType}`);
+      alert(`${taskType} training started.`);
+    } catch (error) {
+      console.error(`Failed to start ${taskType} training.`, error);
+    } finally {
+      setIsTraining(false);
+    }
   };
 
-  useEffect(() => {
-    fetchResults();
-  }, []);
+  const clearLogs = (setter: React.Dispatch<React.SetStateAction<string[]>>) => {
+    setter([]);
+  };
 
   return (
-    <div className="App">
-      <h1>Machine Learning Platform</h1>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Container maxWidth="lg">
+        <Slide appear={false} direction="down" in={!useScrollTrigger()}>
+          <AppBar position="sticky" elevation={4}>
+            <Toolbar>
+              <Typography variant="h5" sx={{ flexGrow: 1 }}>
+                Machine Learning Dashboard
+              </Typography>
+            </Toolbar>
+          </AppBar>
+        </Slide>
 
-      <section>
-        <h2>Insertion Logs</h2>
-        {logMessages? (
-          <ul>
-            {logMessages}
-          </ul>
-        ) : (
-          <p>No insertion logs available.</p>
-        )}
-      </section>
+        <Grid container spacing={4} sx={{ mt: 4, mb: 4 }}>
+          <Grid item xs={12}>
+            <Box display="flex" justifyContent="center" gap={2}>
+              <Button
+                variant="contained"
+                onClick={handleDownload}
+                disabled={loading || isTraining}
+              >
+                Download Dataset
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleRedis}
+                disabled={loading || isTraining}
+              >
+                Load Data to Redis
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleTraining('mlp')}
+                disabled={loading || isTraining}
+              >
+                Train MLP
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleTraining('lstm')}
+                disabled={loading || isTraining}
+              >
+                Train LSTM
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleTraining('cnn')}
+                disabled={loading || isTraining}
+              >
+                Train CNN
+              </Button>
+            </Box>
+          </Grid>
 
-      <div>
-        <button onClick={handleDownload} disabled={loading || isTraining}>
-          Download MNIST Dataset
-        </button>
-        <button onClick={handleTestProducer}>Test Producer</button>
-      </div>
+          <Grid item xs={12} md={6}>
+            <Paper elevation={3} sx={{ p: 2, maxHeight: 300, overflowY: 'auto' }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">Loading Logs</Typography>
+                <IconButton onClick={() => clearLogs(setLoadingLogs)} size="small">
+                  <DeleteIcon />
+                </IconButton>
+              </Box>
+              <List>
+                {loadingLogs.map((log, index) => (
+                  <ListItem key={index}>
+                    <ListItemText primary={log} />
+                  </ListItem>
+                ))}
+                <div ref={logsEndRef} />
+              </List>
+            </Paper>
+          </Grid>
 
-      <div>
-        <button onClick={() => handleTraining('mlp')} disabled={loading || isTraining}>
-          Train MLP
-        </button>
-        <button onClick={() => handleTraining('lstm')} disabled={loading || isTraining}>
-          Train LSTM
-        </button>
-        <button onClick={() => handleTraining('cnn')} disabled={loading || isTraining}>
-          Train CNN
-        </button>
-      </div>
+          <Grid item xs={12} md={6}>
+            <Paper elevation={3} sx={{ p: 2, maxHeight: 300, overflowY: 'auto' }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="h6">Training Logs</Typography>
+                <IconButton onClick={() => clearLogs(setTrainingLogs)} size="small">
+                  <DeleteIcon />
+                </IconButton>
+              </Box>
+              <List>
+                {trainingLogs.map((log, index) => (
+                  <ListItem key={index}>
+                    <ListItemText primary={log} />
+                  </ListItem>
+                ))}
+                <div ref={logsEndRef} />
+              </List>
+            </Paper>
+          </Grid>
 
-      <section>
-        <h2>Training Logs</h2>
-        {trainingLogs.length ? (
-          <ul>
-            {trainingLogs}
-          </ul>
-        ) : (
-          <p>No training logs available.</p>
-        )}
-      </section>
-
-      <section>
-        <h2>Training Results</h2>
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <ul>
-            {trainingResults.map((result, index) => (
-              <li key={index}>
-                {result.task_type}: Accuracy - {result.accuracy}, Loss - {result.loss}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
+          <Grid item xs={12}>
+            <Paper elevation={3} sx={{ p: 3 }}>
+              <Typography variant="h6">Training Results</Typography>
+              {loading ? (
+                <CircularProgress />
+              ) : (
+                <List>
+                  {trainingResults.map((result, index) => (
+                    <ListItem key={index}>
+                      <ListItemText
+                        primary={`${result.task_type}: Accuracy - ${result.accuracy}, Loss - ${result.loss}`}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Paper>
+          </Grid>
+        </Grid>
+      </Container>
+    </ThemeProvider>
   );
 };
 

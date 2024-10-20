@@ -1,8 +1,8 @@
+
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Flatten, LSTM
 from tensorflow.keras.optimizers import Adam
-import numpy as np
-import logging
+
 
 def build_mlp_model(input_shape):
     model = Sequential([
@@ -41,6 +41,5 @@ def build_cnn_model(input_shape):
     model.compile(optimizer=Adam(), loss='categorical_crossentropy', metrics=['accuracy'])
     return model
 
-def train_model(task_type, model):
-    logging.info(f"Training {task_type} model...")
-    logging.info(f"{task_type} model training completed.")
+
+

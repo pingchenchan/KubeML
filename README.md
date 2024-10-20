@@ -11,16 +11,16 @@ docker-compose up -d --build
 docker network inspect my_network
 
 
-docker exec -it cassandra-node cqlsh
+docker exec -it cassandra-node1 cqlsh
 USE my_dataset_keyspace;
 TRUNCATE mnist_data;
 SELECT COUNT(*) FROM mnist_data;
 
 
 docker-compose down --remove-orphans && docker-compose up --build
+docker network inspect kubeml_my_network
 
-
-docker-compose down  && docker-compose up --build 
+docker-compose down  && docker-compose up  -d  --build 
 
 docker exec -it cassandra-node1 nodetool status
 

@@ -42,6 +42,25 @@ services:
     depends_on:
       - kafka
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - my_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - my_network
+    depends_on:
+      - prometheus
 
   cassandra-node1:
     image: cassandra:latest
@@ -78,9 +97,6 @@ services:
       - CASSANDRA_CLUSTER_NAME=my_cluster
       - CASSANDRA_DC=dc1
       - CASSANDRA_RACK=rack1
-    depends_on:
-      cassandra-node1:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
       interval: 10s
@@ -89,25 +105,6 @@ services:
 
 
 
-
-
-  master_node:
-    build: ./master_node
-    container_name: master-node
-    ports:
-      - "5000:5000"
-    environment:
-      - CASSANDRA_HOST=cassandra-node1,cassandra-node2
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-    volumes:
-      - ./master_node:/app
-    depends_on:
-      kafka:
-        condition: service_healthy
-      cassandra-node1:
-        condition: service_healthy
-    networks:
-      - my_network
 
   redis:
     image: "redis:alpine"
@@ -122,13 +119,35 @@ services:
         timeout: 5s
         retries: 5
 
+
+
+  master_node:
+    build: ./master_node
+    container_name: master-node
+    ports:
+      - "5000:5000"
+    environment:
+      - CASSANDRA_HOST=cassandra-node1,cassandra-node2
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - REDIS_HOST=redis
+    volumes:
+      - ./master_node:/app
+    depends_on:
+      kafka:
+        condition: service_healthy
+      cassandra-node1:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - my_network
+
+
   worker_node:
     build: ./worker_node
     container_name: worker-node
     depends_on:
       kafka:
-        condition: service_healthy
-      cassandra-node1:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -137,7 +156,6 @@ services:
     networks:
       - my_network
     environment:
-      - CASSANDRA_HOST=cassandra-node1
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - REDIS_HOST=redis
     volumes:
@@ -155,6 +173,42 @@ services:
     restart: always
     volumes: 
       - ./frontend:/app
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis:6379
+    networks:
+      - my_network
+    depends_on:
+      - redis
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    container_name: kafka-exporter
+    ports:
+      - "9308:9308"
+    environment:
+      KAFKA_BROKERS: kafka:9092
+    networks:
+      - my_network
+    depends_on:
+      - kafka
+
+  cadvisor:
+    image: google/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    networks:
+      - my_network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /sys:/sys
+      - /var/lib/docker/:/var/lib/docker/
 
 volumes:
   cassandra_data_node1:
