@@ -10,7 +10,7 @@ from settings import KAFKA_SERVER
 
 def create_kafka_topics():
     """檢查並創建 Kafka 主題。"""
-    admin_client = AdminClient({'bootstrap.servers': KAFKA_SERVER})
+    admin_client = AdminClient({'bootstrap.servers': ','.join(KAFKA_SERVER)})
     topics = ['task', 'training_log']
     existing_topics = admin_client.list_topics().topics
 
@@ -32,7 +32,7 @@ def create_kafka_topics():
 create_kafka_topics()
 
 # 配置 Kafka Producer
-producer = Producer({'bootstrap.servers': KAFKA_SERVER})
+producer = Producer({'bootstrap.servers': ','.join(KAFKA_SERVER)})
 
 def delivery_report(err, msg):
     """Callback function to confirm message delivery."""
@@ -67,7 +67,7 @@ def start_kafka_consumer():
     """在獨立執行緒中啟動 Kafka 消費者"""
     try:
         consumer = Consumer({
-            'bootstrap.servers': KAFKA_SERVER,
+            'bootstrap.servers': ','.join(KAFKA_SERVER),
             'group.id': 'log-consumer-group0',
             'auto.offset.reset': 'earliest',
             'group.instance.id': 'log-consumer-instance-1', 

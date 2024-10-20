@@ -18,10 +18,13 @@ import {
   IconButton,
   Slide,
   useScrollTrigger,
+  ButtonGroup,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import theme from './theme';
 import DeleteIcon from '@mui/icons-material/Delete';
-
+import CloudUploadIcon from '@mui/icons-material/CloudDownload'
 const App: React.FC = () => {
   const [loadingLogs, setLoadingLogs] = useState<string[]>([]);
   const [trainingLogs, setTrainingLogs] = useState<string[]>([]);
@@ -29,7 +32,10 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [isTraining, setIsTraining] = useState<boolean>(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
-
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState<'success' | 'error'>('success');
+  
   const API_BASE_URL = 'http://localhost:5000';
 
   useEffect(() => {
@@ -37,6 +43,7 @@ const App: React.FC = () => {
 
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log('Received data:', data);
 
       switch (data.log_type) {
         case 'loading':
@@ -45,7 +52,7 @@ const App: React.FC = () => {
         case 'training':
           const trainingMessage =
             data.epoch !== undefined
-              ? `Epoch ${data.epoch}: Accuracy - ${data.accuracy}, Loss - ${data.loss}`
+              ? `Epoch ${data.epoch}: Accuracy - ${data.accuracy }, Loss - ${data.loss }`
               : data.message;
           addLog(setTrainingLogs, trainingMessage);
           break;
@@ -67,6 +74,16 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const showSnackbar = (message: string, severity: 'success' | 'error' = 'success') => {
+    setSnackbarMessage(message);
+    setSnackbarSeverity(severity);
+    setSnackbarOpen(true);
+  };
+  
+  const handleSnackbarClose = () => {
+    setSnackbarOpen(false);
+  };
+  
   const addLog = (
     setter: React.Dispatch<React.SetStateAction<string[]>>,
     message: string
@@ -83,10 +100,11 @@ const App: React.FC = () => {
   const handleDownload = async () => {
     setLoading(true);
     try {
+      showSnackbar('Downloading MNIST data...', 'success');
       await axios.post(`${API_BASE_URL}/store_mnist_dataset_to_cassandra`);
-      alert('MNIST data downloaded and stored in Cassandra.');
+      showSnackbar('MNIST data downloaded and stored in Cassandra.', 'success');
     } catch (error) {
-      console.error('Failed to download MNIST data.', error);
+      showSnackbar('Failed to download MNIST data.', 'error');
     } finally {
       setLoading(false);
     }
@@ -96,21 +114,22 @@ const App: React.FC = () => {
     setLoading(true);
     try {
       await axios.get(`${API_BASE_URL}/store_data_from_cassandra_to_redis`);
-      alert('Data loaded into Redis successfully.');
+      showSnackbar('Data loaded into Redis successfully.', 'success');
     } catch (error) {
       console.error('Failed to load data into Redis.', error);
+      showSnackbar('Failed to load data into Redis.', 'error');
     } finally {
       setLoading(false);
     }
   };
-
   const handleTraining = async (taskType: string) => {
     setIsTraining(true);
     try {
       await axios.post(`${API_BASE_URL}/send_task/${taskType}`);
-      alert(`${taskType} training started.`);
+      showSnackbar(`${taskType} training started.`, 'success');
     } catch (error) {
       console.error(`Failed to start ${taskType} training.`, error);
+      showSnackbar(`Failed to start ${taskType} training.`, 'error');
     } finally {
       setIsTraining(false);
     }
@@ -122,6 +141,17 @@ const App: React.FC = () => {
 
   return (
     <ThemeProvider theme={theme}>
+          <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={6000}
+          onClose={handleSnackbarClose}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: '100%' }}>
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
+
       <CssBaseline />
       <Container maxWidth="lg">
         <Slide appear={false} direction="down" in={!useScrollTrigger()}>
@@ -137,51 +167,63 @@ const App: React.FC = () => {
         <Grid container spacing={4} sx={{ mt: 4, mb: 4 }}>
           <Grid item xs={12}>
             <Box display="flex" justifyContent="center" gap={2}>
+
+            <ButtonGroup variant="outlined" aria-label="Basic button group" >
               <Button
-                variant="contained"
                 onClick={handleDownload}
                 disabled={loading || isTraining}
+                startIcon={<CloudUploadIcon />}
+                color="primary"
               >
                 Download Dataset
               </Button>
               <Button
-                variant="contained"
+
                 onClick={handleRedis}
                 disabled={loading || isTraining}
               >
                 Load Data to Redis
               </Button>
+              </ButtonGroup>
+
+              <ButtonGroup aria-label="Basic button group"  >
               <Button
-                variant="contained"
+
                 onClick={() => handleTraining('mlp')}
                 disabled={loading || isTraining}
               >
                 Train MLP
               </Button>
               <Button
-                variant="contained"
+
                 onClick={() => handleTraining('lstm')}
                 disabled={loading || isTraining}
               >
                 Train LSTM
               </Button>
               <Button
-                variant="contained"
+
                 onClick={() => handleTraining('cnn')}
                 disabled={loading || isTraining}
               >
                 Train CNN
               </Button>
+              </ButtonGroup>
+
+
             </Box>
           </Grid>
 
           <Grid item xs={12} md={6}>
-            <Paper elevation={3} sx={{ p: 2, maxHeight: 300, overflowY: 'auto' }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Typography variant="h6">Loading Logs</Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center">
+            <Typography variant="h6">Loading Logs</Typography>
                 <IconButton onClick={() => clearLogs(setLoadingLogs)} size="small">
                   <DeleteIcon />
                 </IconButton>
+          </Box>
+            <Paper elevation={3} sx={{  mt:2, p: 1,  overflowY: 'auto',height: '30vh'  }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center"  >
+               
               </Box>
               <List>
                 {loadingLogs.map((log, index) => (
@@ -195,12 +237,16 @@ const App: React.FC = () => {
           </Grid>
 
           <Grid item xs={12} md={6}>
-            <Paper elevation={3} sx={{ p: 2, maxHeight: 300, overflowY: 'auto' }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center">
-                <Typography variant="h6">Training Logs</Typography>
-                <IconButton onClick={() => clearLogs(setTrainingLogs)} size="small">
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">Training Logs</Typography>
+            < IconButton onClick={() => clearLogs(setTrainingLogs)} size="small">
                   <DeleteIcon />
-                </IconButton>
+                </IconButton>  
+                
+                </Box>
+            <Paper elevation={3} sx={{ mt:2, p: 1, overflowY: 'auto',height: '30vh' }}>
+              <Box display="flex" justifyContent="space-between" alignItems="center" >
+
               </Box>
               <List>
                 {trainingLogs.map((log, index) => (
@@ -213,25 +259,30 @@ const App: React.FC = () => {
             </Paper>
           </Grid>
 
-          <Grid item xs={12}>
-            <Paper elevation={3} sx={{ p: 3 }}>
-              <Typography variant="h6">Training Results</Typography>
-              {loading ? (
+          <Grid item xs={12}>          
+          <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6">Training Results</Typography>
+ </Box>
+         
+            <Paper elevation={3} sx={{mt:2, p: 3 }}>
+             
+              {/* {loading ? (
                 <CircularProgress />
-              ) : (
+              ) : ( */}
                 <List>
                   {trainingResults.map((result, index) => (
                     <ListItem key={index}>
                       <ListItemText
-                        primary={`${result.task_type}: Accuracy - ${result.accuracy}, Loss - ${result.loss}`}
+                        primary={`${result.task_type}: Accuracy - ${result.accuracy }, Loss - ${result.loss }`}
                       />
                     </ListItem>
                   ))}
                 </List>
-              )}
+              {/* )} */}
             </Paper>
           </Grid>
         </Grid>
+
       </Container>
     </ThemeProvider>
   );

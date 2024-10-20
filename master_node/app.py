@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
 import pickle
@@ -37,16 +38,23 @@ async def startup_event():
     start_kafka_consumer()
     logging.info("Kafka listener starting...")
 
+def event_stream():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    while True:
+        message = loop.run_until_complete(message_queue.get())
+        yield f"data: {json.dumps(message)}\n\n"
+        loop.run_until_complete(message_queue.task_done())
+
 @app.get("/logs/stream")
 async def get_logs():
     """SSE 端點，持續發送 Kafka 消息給前端"""
     async def event_stream():
         while True:
-            # 從 asyncio.Queue 非同步地取出消息
             message = await message_queue.get()
 
             yield f"data: {json.dumps(message)}\n\n"
-            message_queue.task_done()  # 標記該任務已完成
+            message_queue.task_done()  
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -113,18 +121,21 @@ async def store_mnist_data():
     try:
         setup_dataset_table(session)
         send_to_kafka("training_log", {"log_type": "loading", "message": f"Fetcing {dataset_name} data..."})
+        logging.info(f"Fetcing {dataset_name} data...")
         (X_train, y_train), (X_test, y_test) = mnist.load_data()
         X_train = X_train.astype('float32') / 255
         X_test = X_test.astype('float32') / 255
         y_train = to_categorical(y_train, 10)
         y_test = to_categorical(y_test, 10)
-
+        
+        logging.info(f"Dividing {dataset_name} data into chunks...")
         send_to_kafka("training_log", {"log_type": "loading", "message": f"Dividing {dataset_name} data into chunks..."})
+        
         await store_chunked_data(session, f"{dataset_name}_X_train", X_train)
         await store_chunked_data(session, f"{dataset_name}_y_train", y_train)
         await store_chunked_data(session, f"{dataset_name}_X_test", X_test)
         await store_chunked_data(session, f"{dataset_name}_y_test", y_test)
-        
+        logging.info(f"{dataset_name} data successfully stored.")
         send_to_kafka("training_log", {"log_type": "loading", "message": f"{dataset_name} data successfully stored."})
         return {"status": f"{dataset_name} data successfully stored."}
     

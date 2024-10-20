@@ -11,7 +11,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.callbacks import Callback
 
 
-producer = Producer({'bootstrap.servers': KAFKA_SERVER})
+producer = Producer({'bootstrap.servers': ','.join(KAFKA_SERVER)})
 
 async def train_model(task_type: str, model: Sequential):
     dataset_name = 'mnist'
@@ -51,9 +51,14 @@ async def train_model(task_type: str, model: Sequential):
     model.fit(X_train, y_train, epochs=5, batch_size=128, verbose=1, callbacks=[kafka_callback])
     loss, accuracy = model.evaluate(X_test, y_test)
     
-    logging.info(f"{task_type} training complete. Accuracy: {accuracy}, Loss: {loss}")
+    logging.info(f"{task_type} training complete. Accuracy: {accuracy:.3f}, Loss: {loss:.3f}")
     # Publish result to Kafka
-    result = {'log_type': 'result',"task_type": task_type, "accuracy": accuracy, "loss": loss}
+    result = {
+        'log_type': 'result',
+        'task_type': task_type,
+        'accuracy': f"{accuracy:.3f}",
+        'loss': f"{loss:.3f}"
+    }
     send_to_kafka('training_log', result)
 
 class KafkaCallback(Callback):
@@ -65,8 +70,8 @@ class KafkaCallback(Callback):
         message = {
             "task_type": self.task_type,
             "epoch": epoch,
-            "accuracy": logs.get("accuracy"),
-            "loss": logs.get("loss"),
+            "accuracy": f"{logs.get('accuracy'):.3f}" if logs.get("accuracy") is not None else None,
+            "loss": f"{logs.get('loss'):.3f}" if logs.get("loss") is not None else None,
             'log_type': 'training',
         }
         
@@ -138,7 +143,7 @@ def consume_loop(consumer):
 def start_kafka_consumer():
     try:
         consumer = Consumer({
-            'bootstrap.servers': KAFKA_SERVER,
+            'bootstrap.servers': ','.join(KAFKA_SERVER),
             'group.id': 'worker-node-group11',
             'auto.offset.reset': 'earliest'
         })
