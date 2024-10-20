@@ -103,8 +103,16 @@ services:
       timeout: 5s
       retries: 5
 
-
-
+  # cassandra-exporter-node1:
+  #   image: criteord/cassandra_exporter:latest
+  #   container_name: cassandra-exporter-node1
+  #   ports:
+  #     - "9180:9180"  # Cassandra exporter metrics endpoint
+  #   networks:
+  #     - my_network
+  #   depends_on:
+  #     - cassandra-node1
+  #   command: "--cassandra.host=cassandra-node1 --cassandra.port=9042 --listen-address=0.0.0.0"
 
   redis:
     image: "redis:alpine"
@@ -165,7 +173,7 @@ services:
     build: ./frontend
     container_name: frontend
     ports:
-      - "3000:3000"
+      - "3001:3001"
     networks:
       - my_network
     depends_on:
@@ -189,14 +197,16 @@ services:
   kafka-exporter:
     image: danielqsj/kafka-exporter:latest
     container_name: kafka-exporter
+    command: ["--kafka.server=kafka:9092"]
     ports:
       - "9308:9308"
-    environment:
-      KAFKA_BROKERS: kafka:9092
+    # environment:
+    #   KAFKA_BROKERS: kafka:9092
     networks:
       - my_network
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
 
   cadvisor:
     image: google/cadvisor:latest
