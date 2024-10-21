@@ -46,7 +46,7 @@
 
 This platform provides parallel machine learning training services with real-time feedback. It focuses on training deep learning models on the MNIST dataset using three common architectures: MLP, CNN, and LSTM. The system distributes workloads across multiple worker nodes and streams real-time logs to the frontend, offering users immediate insight into the training process.
 
-<figure> <img src="images/fe.png" alt="Parallel Training Dashboard" /> <figcaption> Figure 1: Parallel Training Dashboard 
+<figure> <img src="images/fe.PNG" alt="Parallel Training Dashboard" /> <figcaption> Figure 1: Frontend
 </figcaption> </figure>
 
 
