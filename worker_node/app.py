@@ -1,9 +1,7 @@
 
 import logging
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException
 from kafka_utils import start_kafka_consumer, send_to_kafka
-
-from tensorflow.keras.models import Sequential
 from fastapi.middleware.cors import CORSMiddleware
 from redis_utils import redis_client
 

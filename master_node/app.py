@@ -1,8 +1,6 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import json
 import logging
-import pickle
 from fastapi import FastAPI,HTTPException
 from tensorflow.keras.datasets import mnist
 from tensorflow.keras.utils import to_categorical
@@ -12,7 +10,7 @@ from kafka_utils import  producer, send_to_kafka,start_kafka_consumer, message_q
 from cassandra_utils import fetch_mnist_data
 from redis_utils import cache_to_redis, get_from_redis, redis_client
 from fastapi.responses import StreamingResponse
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 
 logging.basicConfig(
     level=logging.INFO,
@@ -166,7 +164,7 @@ async def fetch_mnist_data_from_cassandra():
         X_test = await fetch_mnist_data(session, f"{dataset_name}_X_test")
         y_test = await fetch_mnist_data(session, f"{dataset_name}_y_test")
         
-        #print shapes in one line
+
         print('X_train.shape', X_train.shape, 'y_train.shape', y_train.shape, 'X_test.shape', X_test.shape, 'y_test.shape', y_test.shape)
         print('type(X_train)', type(X_train))
         cache_to_redis(dataset_name, {"X_train": X_train, "y_train": y_train, "X_test": X_test, "y_test": y_test})
@@ -177,12 +175,12 @@ async def fetch_mnist_data_from_cassandra():
             logging.info(message)
             message = f"Decoding and deserializing {dataset_name} data..."
             send_to_kafka("training_log", {"log_type": "loading", "message": f"{message}"})
-            # 序列化解碼
+
             X_train = cached_data.get("X_train")
             y_train = cached_data.get("y_train")
             X_test = cached_data.get("X_test")
             y_test = cached_data.get("y_test")
-            # 再次印出數據的 shape 和 type
+
             print('Get from redis X_train.shape', X_train.shape, 'y_train.shape', y_train.shape, 'X_test.shape', X_test.shape, 'y_test.shape', y_test.shape)
             print('type(X_train)', type(X_train))
             message = f"Data successfully stored in Redis cache."

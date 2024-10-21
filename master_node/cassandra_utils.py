@@ -97,13 +97,13 @@ async def store_chunked_data(session: Session, dataset_name: str, data):
     
     total_chunks = (len(data_bytes) + CASSANDRA_CHUNK_SIZE - 1) // CASSANDRA_CHUNK_SIZE
 
-    current_batch_size_bytes = 0  # 當前批次的大小 (bytes)
+    current_batch_size_bytes = 0 
 
     for chunk_index, chunk in chunk_data(data_bytes):
         compressed_chunk = gzip.compress(chunk)
         chunk_size_bytes = sys.getsizeof(compressed_chunk)
 
-        # 如果加入當前 chunk 後的大小會超過上限，先執行當前批次
+
         if current_batch_size_bytes + chunk_size_bytes > CASSANDRA_MAX_BATCH_SIZE_BYTES:
             result =  session.execute(data_batch, trace=True)
             try:
@@ -123,18 +123,17 @@ async def store_chunked_data(session: Session, dataset_name: str, data):
                 'total_chunks': total_chunks,
             })
 
-            # 重置批次
+
             partition_id += 1  
             data_batch = BatchStatement(consistency_level=ConsistencyLevel.LOCAL_QUORUM)
             current_batch_size_bytes = 0
             
 
-        # 將 chunk 加入 data_batch 並更新批次大小
         data_batch.add(write_stmt, (dataset_name, partition_id, chunk_index, compressed_chunk))
         # chunk_distribution[partition_id] += 1
         current_batch_size_bytes += chunk_size_bytes
 
-    # 處理剩餘的 chunk
+
     if current_batch_size_bytes > 0:
         session.execute(data_batch)
         result =  session.execute(data_batch, trace=True)
@@ -155,9 +154,9 @@ async def store_chunked_data(session: Session, dataset_name: str, data):
             })
 
 
-    # 更新 metadata 表
+
     metadata_batch = BatchStatement(consistency_level=ConsistencyLevel.LOCAL_QUORUM)
-    for pid in range(partition_id + 1):  # 遍歷所有 partition_id 並更新 metadata
+    for pid in range(partition_id + 1):
         metadata_batch.add(update_stmt, (dataset_name, pid))
     session.execute(metadata_batch)
 
@@ -174,7 +173,6 @@ async def store_chunked_data(session: Session, dataset_name: str, data):
 async def write_chunk(session: Session, stmt: PreparedStatement, dataset_name: str, partition_id: int, chunk: bytes, chunk_distribution: dict):
     bound_stmt = stmt.bind((dataset_name, partition_id, uuid.uuid4(), chunk))
     bound_stmt.consistency_level = ConsistencyLevel.LOCAL_QUORUM
-    # session.execute(bound_stmt)
     result = session.execute(bound_stmt, trace=True)
     
     # # Retrieve and print trace details
@@ -190,7 +188,7 @@ async def write_chunk(session: Session, stmt: PreparedStatement, dataset_name: s
 async def update_metadata(session: Session, stmt: PreparedStatement, dataset_name: str, partition_id: int):
     bound_stmt = stmt.bind((dataset_name, partition_id))
     bound_stmt.consistency_level = ConsistencyLevel.LOCAL_QUORUM
-    # session.execute(bound_stmt)
+
     session.execute(bound_stmt)
 
 
@@ -214,7 +212,6 @@ async def fetch_metadata(session: Session, dataset_name: str):
 
 
 async def fetch_mnist_data(session: Session, dataset_name: str):
-    """從 dataset_data 讀取所有 chunk，按順序合併，並進行解壓縮和反序列化"""
     try:
 
     

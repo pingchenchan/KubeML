@@ -4,7 +4,7 @@ global:
 scrape_configs:
   - job_name: 'kafka'
     static_configs:
-      - targets: ['kafka-exporter:9308']  # Kafka Exporter
+      - targets: ['kafka-exporter:9308'] 
   
   - job_name: 'redis_exporter_targets'
     static_configs:
@@ -21,11 +21,7 @@ scrape_configs:
 
   - job_name: 'redis'
     static_configs:
-      - targets: ['redis-exporter:9121']  # Redis Exporter
-
-  # - job_name: 'cassandra'
-  #   static_configs:
-  #     - targets: ['cassandra-node1:9042', 'cassandra-node2:9142']
+      - targets: ['redis-exporter:9121']  
 
   - job_name: 'docker'
     static_configs:

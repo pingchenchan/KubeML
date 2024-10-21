@@ -152,16 +152,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # cassandra-exporter-node1:
-  #   image: criteord/cassandra_exporter:latest
-  #   container_name: cassandra-exporter-node1
-  #   ports:
-  #     - "9180:9180"  # Cassandra exporter metrics endpoint
-  #   networks:
-  #     - my_network
-  #   depends_on:
-  #     - cassandra-node1
-  #   command: "--cassandra.host=cassandra-node1 --cassandra.port=9042 --listen-address=0.0.0.0"
+
 
   redis:
     image: "redis:alpine"
@@ -198,8 +189,6 @@ services:
         condition: service_healthy
     networks:
       - my_network
-
-
 
 
   worker_node1:
