@@ -24,7 +24,7 @@ def connect_to_cassandra():
         # Create keyspace if it does not exist (using parameterized query)
         query = f"""
             CREATE KEYSPACE IF NOT EXISTS {CASSANDRA_KEYSPACE}
-            WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 1}};
+            WITH replication = {{'class': 'SimpleStrategy', 'replication_factor': 2}};
         """
         session.execute(query)
 
