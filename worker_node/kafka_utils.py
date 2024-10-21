@@ -1,4 +1,5 @@
 import asyncio
+import httpx
 import json
 import logging
 import threading
@@ -30,13 +31,20 @@ async def train_model(task_type: str, model: Sequential):
             logging.info(
                 f"Get from redis X_train.shape: {X_train.shape}, y_train.shape: {y_train.shape}, X_test.shape: {X_test.shape}, y_test.shape: {y_test.shape}"
             )
-            
-            logging.info(f'type(X_train): {type(X_train)}')
-            
         else:
-            logging.error(f"No data found in Redis for {dataset_name}")
-            raise ValueError(f"No data found in Redis cache for {dataset_name}")
+            async with httpx.AsyncClient() as client:
+                logging.info("Asking master node to store data from Cassandra to Redis...")
+                response = await client.get("http://master-node:5000/store_data_from_cassandra_to_redis")
+                logging.info(f"Response from master node: {response.status_code}")
+            if response.status_code == 200:
+                logging.info("Data fetched from Cassandra and cached in Redis.")
+                # Prompt to retry task since the data is now cached
+                raise HTTPException(500, "Data already cached in Redis, please retry the task.")
+            else:
+                raise HTTPException(500, "Failed to fetch data from Redis, please retry the task.")
+
     except Exception as e:
+        logging.error(f"Error during task execution: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch data: {e}")
 
 
@@ -87,7 +95,6 @@ class KafkaCallback(Callback):
 
 
 async def handle_task(task):
-    """處理 Kafka 消息中的任務"""
     try:
         if task is None or 'task_type' not in task:
             raise ValueError("Invalid task received: task is None or missing 'task_type'")
@@ -95,7 +102,6 @@ async def handle_task(task):
         task_type = task['task_type']
         logging.info(f"Received task: {task_type}")
 
-        # 根據 task_type 執行不同模型的訓練
         if task_type == 'mlp':
             await train_model(task_type, build_mlp_model((28, 28)))
         elif task_type == 'lstm':
@@ -106,10 +112,9 @@ async def handle_task(task):
         logging.error(f"Task execution error: {e}")
 
 def consume_loop(consumer):
-    """Kafka 消費者的同步消費迴圈"""
     try:
         while True:
-            msg = consumer.poll(timeout=1.0)  # 每秒輪詢一次消息
+            msg = consumer.poll(timeout=1.0)  
             if msg is None:
                 # logging.info("No message received in this poll.")
                 continue
@@ -169,21 +174,19 @@ def start_kafka_consumer():
 
 
 def send_to_kafka(topic, message):
-    """同步發送 Kafka 消息。"""
     try:
         producer.produce(
             topic=topic,
             value=json.dumps(message).encode('utf-8'),
             callback=delivery_report
         )
-        producer.flush()  # 確保消息送出
+        producer.flush()  
         logging.info(f"Sent message to Kafka topic {topic} with message: {message}")
     except KafkaException as e:
         logging.error(f"Failed to send message to Kafka: {e}")
         raise HTTPException(status_code=500, detail="Kafka send failed")
 
 def delivery_report(err, msg):
-    """Kafka Producer 回呼函數，在消息成功傳遞時呼叫。"""
     if err is not None:
         logging.error(f"Message delivery failed: {err}")
     else:
