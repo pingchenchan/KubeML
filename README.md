@@ -74,7 +74,7 @@ This section outlines the detailed flow of the entire machine learning training 
 3. **Cache Data in Redis**
    - The retrieved dataset is cached in **Redis** for quick access during the training process, reducing future read latency.
 
-4. **Task Assignment**
+4. **Tasks Assignment**
    - The **Master Node** publishes tasks to **Kafka brokers**, where each task is pushed to specific Kafka topics for worker nodes to consume.
 
 5. **Polling Tasks from Kafka**
@@ -88,12 +88,13 @@ This section outlines the detailed flow of the entire machine learning training 
    - Trained models and intermediate results are pushed back to **Kafka** for real-time feedback.
 
 8. **Real-Time Feedback via Kafka**
-   - Training progress and logs are continuously pushed to Kafka and made available for **frontend** consumption via Server-Sent Events (SSE).
+   - Training progress and logs are continuously sent from the **Worker Node** to Kafka, where they are made available for consumption by the **Master Node**.
+
 
 9. **Polling Results from Kafka**
-   - The **Frontend** polls the Kafka topics to receive real-time logs and final results of the training process.
+   - The **Master Node** polls Kafka topics to receive real-time logs and the final results of the training process, then streams them via Server-Sent Events (SSE) to the **frontend**.
 
-10. **Return Training Results**
+10. **Displays Training Results**
     - Once the training is complete, the **Frontend** displays the results to the user, providing feedback on the model's performance.
 
 11. **Monitoring and Visualization**
