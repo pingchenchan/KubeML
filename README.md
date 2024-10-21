@@ -16,13 +16,13 @@
       - [High Availability and Fault Tolerance Database](#high-availability-and-fault-tolerance-database)
       - [System Monitoring](#system-monitoring)
   - [Core Features](#core-features)
-      - [Model Selection and Training Task Initiation](#model-selection-and-training-task-initiation)
-      - [Task Coordination and Orchestration](#task-coordination-and-orchestration)
-      - [Task Distribution and Real-time Logging](#task-distribution-and-real-time-logging)
-      - [High Availability Data Storage](#high-availability-data-storage)
-      - [Parallel Model Training:](#parallel-model-training)
-      - [In-memory Caching Layer](#in-memory-caching-layer)
-      - [System Monitoring and Visualization](#system-monitoring-and-visualization)
+    - [Model Selection and Training Task Initiation](#model-selection-and-training-task-initiation)
+    - [Task Coordination and Orchestration](#task-coordination-and-orchestration)
+    - [Task Distribution and Real-time Logging](#task-distribution-and-real-time-logging)
+    - [High Availability Data Storage](#high-availability-data-storage)
+    - [Parallel Model Training:](#parallel-model-training)
+    - [In-memory Caching Layer](#in-memory-caching-layer)
+    - [System Monitoring and Visualization](#system-monitoring-and-visualization)
   - [Grafana Dashboards: Monitored Metrics](#grafana-dashboards-monitored-metrics)
       - [Prometheus Configuration Overview](#prometheus-configuration-overview)
       - [Dashboard: Docker Containers Overview](#dashboard-docker-containers-overview)
@@ -147,7 +147,7 @@ Prometheus and Grafana monitor system health and resource usage, ensuring reliab
 ## Core Features
 
 
-#### Model Selection and Training Task Initiation
+### Model Selection and Training Task Initiation
 Provides a user-friendly interface built with React for deep learning model selection and real-time log viewing.
 **Technology Stack:** ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=white&style=flat) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white&style=flat) ![MUI](https://img.shields.io/badge/MUI-007FFF?logo=mui&logoColor=white&style=flat)
 **Functionality:**
@@ -155,7 +155,7 @@ Provides a user-friendly interface built with React for deep learning model sele
 - Real-time logs are streamed via SSE to keep users informed.
 
 
-#### Task Coordination and Orchestration
+### Task Coordination and Orchestration
  The master node receives user requests, stores data in Cassandra, and distributes tasks to worker nodes through Kafka.
 **Technology Stack:** ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white&style=flat) ![Cassandra](https://img.shields.io/badge/Cassandra-1287B1?logo=apache-cassandra&logoColor=white&style=flat) ![Kafka](https://img.shields.io/badge/Kafka-231F20?logo=apache-kafka&logoColor=white&style=flat)
 
@@ -167,7 +167,7 @@ Provides a user-friendly interface built with React for deep learning model sele
 - **Task Decoupling:** Use Kafka topics to decouple task coordination
 -  **Asynchronous Processing:** Handle requests asynchronously in FastAPI 
 
-#### Task Distribution and Real-time Logging
+### Task Distribution and Real-time Logging
 Kafka handles task distribution between the master and worker nodes and provides real-time log streaming to the frontend.
 **Technology Stack:** ![Kafka](https://img.shields.io/badge/Kafka-231F20?logo=apache-kafka&logoColor=white&style=flat)
 
@@ -180,7 +180,7 @@ Kafka handles task distribution between the master and worker nodes and provides
   - **Real-time Feedback:** Use Server-Sent Events (SSE) for continuous log streaming to keep users engaged.
 
 
-#### High Availability Data Storage
+### High Availability Data Storage
  Cassandra stores datasets and metadata, ensuring fast read and write operations for training tasks.
 
 **Technology Stack:** ![Cassandra](https://img.shields.io/badge/Cassandra-1287B1?logo=apache-cassandra&logoColor=white&style=flat)
@@ -194,7 +194,7 @@ Kafka handles task distribution between the master and worker nodes and provides
   - **Consistency Level Configuration:** Use LOCAL_QUORUM for a balance between performance and consistency.
   - **Compression for Efficiency:** Store datasets in compressed 5MB chunks to improve storage efficiency.
 
-#### Parallel Model Training:
+### Parallel Model Training:
 Worker nodes retrieve tasks from Kafka, access data from Cassandra or Redis, and perform model training in parallel.
 **Technology Stack:** ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white&style=flat) ![TensorFlow](https://img.shields.io/badge/TensorFlow-FF6F00?logo=tensorflow&logoColor=white&style=flat) ![Kafka](https://img.shields.io/badge/Kafka-231F20?logo=apache-kafka&logoColor=white&style=flat) ![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white&style=flat)
 
@@ -207,7 +207,7 @@ Worker nodes retrieve tasks from Kafka, access data from Cassandra or Redis, and
   - **Caching for Performance:** Use Redis caching to reduce repeated access to Cassandra and improve performance.
   - **Real-time Monitoring:** Send periodic updates during training to Kafka to track task progress.
 
-#### In-memory Caching Layer
+### In-memory Caching Layer
 Redis stores frequently accessed datasets, reducing the load on Cassandra and improving data retrieval times.
 **Technology Stack:** ![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white&style=flat)
 
@@ -218,7 +218,7 @@ Redis stores frequently accessed datasets, reducing the load on Cassandra and im
 **Best Practices:**
 - **Caching of Datasets:** Redis serves as an in-memory cache for datasets (e.g., MNIST) used during model training, avoiding repeated access to Cassandra and improving performance.
 
-#### System Monitoring and Visualization
+### System Monitoring and Visualization
 Prometheus collects system metrics, and Grafana visualizes resource usage and training progress.
 **Technology Stack:** ![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white&style=flat) ![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white&style=flat)
 
