@@ -5,11 +5,12 @@ import threading
 from confluent_kafka import Producer, Consumer, KafkaException,KafkaError
 from http.client import HTTPException
 from redis_utils import get_from_redis
-from settings import KAFKA_SERVER
+from settings import KAFKA_SERVER, WORKER_ID
 from models import build_cnn_model, build_lstm_model, build_mlp_model
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.callbacks import Callback
-
+import tensorflow.keras.backend as K
+import gc
 
 producer = Producer({'bootstrap.servers': ','.join(KAFKA_SERVER)})
 
@@ -45,7 +46,7 @@ async def train_model(task_type: str, model: Sequential):
         X_train, X_test = X_train.reshape(-1, 28, 28, 1), X_test.reshape(-1, 28, 28, 1)
 
     logging.info(f"Training {task_type} model...")
-    send_to_kafka('training_log',{'log_type': 'training', 'message': f"Training {task_type} model..."})
+    send_to_kafka('training_log',{'log_type': 'training', 'message': f"{WORKER_ID} is training {task_type} model..."})
     
     kafka_callback = KafkaCallback(task_type)
     model.fit(X_train, y_train, epochs=5, batch_size=128, verbose=1, callbacks=[kafka_callback])
@@ -54,12 +55,17 @@ async def train_model(task_type: str, model: Sequential):
     logging.info(f"{task_type} training complete. Accuracy: {accuracy:.3f}, Loss: {loss:.3f}")
     # Publish result to Kafka
     result = {
+        'worker_id': WORKER_ID,
         'log_type': 'result',
         'task_type': task_type,
         'accuracy': f"{accuracy:.3f}",
         'loss': f"{loss:.3f}"
     }
     send_to_kafka('training_log', result)
+    
+    del X_train, y_train, X_test, y_test, model  
+    clear_session() 
+    force_gc() 
 
 class KafkaCallback(Callback):
     def __init__(self, task_type):
@@ -73,6 +79,7 @@ class KafkaCallback(Callback):
             "accuracy": f"{logs.get('accuracy'):.3f}" if logs.get("accuracy") is not None else None,
             "loss": f"{logs.get('loss'):.3f}" if logs.get("loss") is not None else None,
             'log_type': 'training',
+            'worker_id': WORKER_ID
         }
         
         
@@ -144,7 +151,7 @@ def start_kafka_consumer():
     try:
         consumer = Consumer({
             'bootstrap.servers': ','.join(KAFKA_SERVER),
-            'group.id': 'worker-node-group11',
+            'group.id': 'task-consumer-group-1',
             'auto.offset.reset': 'earliest'
         })
         consumer.subscribe(["task"])
@@ -181,3 +188,10 @@ def delivery_report(err, msg):
         logging.error(f"Message delivery failed: {err}")
     else:
         logging.info(f"Message delivered to {msg.topic()} [{msg.partition()}]")
+def clear_session():
+    K.clear_session()
+    logging.info("TensorFlow session cleared to release memory.")
+
+def force_gc():
+    gc.collect()
+    logging.info("Garbage collection executed.")

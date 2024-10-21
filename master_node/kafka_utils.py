@@ -11,19 +11,27 @@ from settings import KAFKA_SERVER
 def create_kafka_topics():
     """檢查並創建 Kafka 主題。"""
     admin_client = AdminClient({'bootstrap.servers': ','.join(KAFKA_SERVER)})
-    topics = ['task', 'training_log']
+
+    topics = [
+        {'name': 'task', 'partitions': 3, 'replication_factor': 3},
+        {'name': 'training_log', 'partitions': 2, 'replication_factor': 2},
+        {'name': 'load_data', 'partitions': 2, 'replication_factor': 1}
+    ]
+    
     existing_topics = admin_client.list_topics().topics
 
     new_topics = [
-        NewTopic(topic, num_partitions=1, replication_factor=1)
-        for topic in topics if topic not in existing_topics
+        NewTopic(topic['name'], 
+                 num_partitions=topic['partitions'], 
+                 replication_factor=topic['replication_factor'])
+        for topic in topics if topic['name'] not in existing_topics
     ]
 
     if new_topics:
         futures = admin_client.create_topics(new_topics)
         for topic, future in futures.items():
             try:
-                future.result()  # 阻塞等待主題創建完成
+                future.result()  
                 print(f"Created topic: {topic}")
             except Exception as e:
                 print(f"Failed to create topic {topic}: {e}")
@@ -68,7 +76,7 @@ def start_kafka_consumer():
     try:
         consumer = Consumer({
             'bootstrap.servers': ','.join(KAFKA_SERVER),
-            'group.id': 'log-consumer-group0',
+            'group.id': 'training-log-consumer-group-1',
             'auto.offset.reset': 'earliest',
             'group.instance.id': 'log-consumer-instance-1', 
         })

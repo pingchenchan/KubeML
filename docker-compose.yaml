@@ -24,11 +24,9 @@ services:
       - my_network
     depends_on:
       - zookeeper
-      # :
-        # condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
       retries: 5
 
@@ -48,11 +46,31 @@ services:
       - my_network
     depends_on:
       - zookeeper
-      # :
-        # condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9093"]
-      interval: 30s
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  kafka-node3:
+    image: wurstmeister/kafka:latest
+    container_name: kafka-node3
+    ports:
+      - "9094:9094"
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-node3:9094
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks:
+      - my_network
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9094"]
+      interval: 15s
       timeout: 10s
       retries: 5
 
@@ -62,18 +80,20 @@ services:
     ports:
       - "9000:9000"
     environment:
-      KAFKA_BROKER_CONNECT: kafka-node1:9092,kafka-node2:9093
+      KAFKA_BROKER_CONNECT: kafka-node1:9092,kafka-node2:9093, kafka-node3:9094
     networks:
       - my_network
     depends_on:
       - kafka-node1
       - kafka-node2
+      - kafka-node3
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus 
     ports:
       - "9090:9090"
     networks:
@@ -82,6 +102,8 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    volumes:
+      - grafana-data:/var/lib/grafana 
     ports:
       - "3000:3000"
     networks:
@@ -163,7 +185,7 @@ services:
       - "5000:5000"
     environment:
       - CASSANDRA_HOST=cassandra-node1,cassandra-node2
-      - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093,kafka-node3:9094
       - REDIS_HOST=redis
     volumes:
       - ./master_node:/app
@@ -176,13 +198,15 @@ services:
         condition: service_healthy
     networks:
       - my_network
-    restart: on-failure
 
 
 
-  worker_node:
-    build: ./worker_node
-    container_name: worker-node
+
+  worker_node1:
+    build:
+      context: ./worker_node
+      dockerfile: Dockerfile.worker1
+    container_name: worker-node1
     depends_on:
       kafka-node1:
         condition: service_healthy
@@ -193,8 +217,33 @@ services:
     networks:
       - my_network
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093,kafka-node3:9094
       - REDIS_HOST=redis
+      - WORKER_ID=worker-1
+      - PORT=8000
+    volumes:
+      - ./worker_node:/app
+    restart: on-failure
+
+  worker_node2:
+    build:
+      context: ./worker_node 
+      dockerfile: Dockerfile.worker2
+    container_name: worker-node2
+    depends_on:
+      kafka-node1:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "9001:9001"
+    networks:
+      - my_network
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093,kafka-node3:9094
+      - REDIS_HOST=redis
+      - WORKER_ID=worker-2
+      - PORT=9001
     volumes:
       - ./worker_node:/app
     restart: on-failure
@@ -228,17 +277,17 @@ services:
   kafka-exporter:
     image: danielqsj/kafka-exporter:latest
     container_name: kafka-exporter
-    command: ["--kafka.server=kafka-node1:9092", "--kafka.server=kafka-node2:9093"]
+    command: ["--kafka.server=kafka-node1:9092", "--kafka.server=kafka-node2:9093","--kafka.server=kafka-node3:9094"]
     ports:
       - "9308:9308"
-    # environment:
-    #   KAFKA_BROKERS: kafka:9092
     networks:
       - my_network
     depends_on:
       kafka-node1:
         condition: service_healthy
       kafka-node2:
+        condition: service_healthy
+      kafka-node3:
         condition: service_healthy
 
   cadvisor:
@@ -256,6 +305,8 @@ services:
 volumes:
   cassandra_data_node1:
   cassandra_data_node2:
+  prometheus-data: 
+  grafana-data: 
 
 
 networks:

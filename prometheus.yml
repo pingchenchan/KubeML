@@ -23,9 +23,9 @@ scrape_configs:
     static_configs:
       - targets: ['redis-exporter:9121']  # Redis Exporter
 
-  - job_name: 'cassandra'
-    static_configs:
-      - targets: ['cassandra-node1:9042', 'cassandra-node2:9142']
+  # - job_name: 'cassandra'
+  #   static_configs:
+  #     - targets: ['cassandra-node1:9042', 'cassandra-node2:9142']
 
   - job_name: 'docker'
     static_configs:

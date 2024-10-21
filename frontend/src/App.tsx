@@ -13,7 +13,7 @@ import {
   Paper,
   CssBaseline,
   Grid,
-  CircularProgress,
+  // CircularProgress,
   ThemeProvider,
   IconButton,
   Slide,
@@ -52,12 +52,13 @@ const App: React.FC = () => {
         case 'training':
           const trainingMessage =
             data.epoch !== undefined
-              ? `Epoch ${data.epoch}: Accuracy - ${data.accuracy }, Loss - ${data.loss }`
+              ? `${data.worker_id}:Epoch ${data.epoch}: Accuracy - ${data.accuracy }, Loss - ${data.loss }`
               : data.message;
           addLog(setTrainingLogs, trainingMessage);
           break;
         case 'result':
-          setTrainingResults((prevResults) => [...prevResults, data]);
+          showSnackbar(`${data.task_type} model training successfully completed`, 'success');  
+         setTrainingResults((prevResults) => [...prevResults, data]);
           break;
         default:
           console.warn('Unknown log type:', data.log_type);
@@ -175,10 +176,10 @@ const App: React.FC = () => {
                 startIcon={<CloudUploadIcon />}
                 color="primary"
               >
-                Download Dataset
+                Load Data to Cassandra
               </Button>
               <Button
-
+startIcon={<CloudUploadIcon />}
                 onClick={handleRedis}
                 disabled={loading || isTraining}
               >
@@ -273,7 +274,7 @@ const App: React.FC = () => {
                   {trainingResults.map((result, index) => (
                     <ListItem key={index}>
                       <ListItemText
-                        primary={`${result.task_type}: Accuracy - ${result.accuracy }, Loss - ${result.loss }`}
+                        primary={`${result.worker_id}: ${result.task_type}: Accuracy - ${result.accuracy }, Loss - ${result.loss }`}
                       />
                     </ListItem>
                   ))}
