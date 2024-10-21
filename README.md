@@ -46,6 +46,9 @@
 
 This platform provides parallel machine learning training services with real-time feedback. It focuses on training deep learning models on the MNIST dataset using three common architectures: MLP, CNN, and LSTM. The system distributes workloads across multiple worker nodes and streams real-time logs to the frontend, offering users immediate insight into the training process.
 
+<figure> <img src="images/fe.png" alt="Parallel Training Dashboard" /> <figcaption> Figure 1: Parallel Training Dashboard 
+</figcaption> </figure>
+
 
 ## Architecture Introduction
 
@@ -56,7 +59,10 @@ This parallel training platform leverages Cassandra for scalable data storage, R
 
 This section outlines the detailed flow of the entire machine learning training system. The diagram below showcases the interaction between components for data loading, task distribution, model training, caching, and monitoring.
 
-![System Architecture](images/Chart.png)
+<figure> <img src="images/Chart.png" alt="Parallel Training Dashboard" /> <figcaption> Figure 2: System Architecture
+</figcaption> </figure>
+
+
 
 
 1. **Frontend Request**
@@ -253,7 +259,12 @@ In this machine learning platform, Prometheus gathers system metrics from multip
 
 
 #### Dashboard: Docker Containers Overview
-![System Architecture](images/docker.png)
+<figure> <img src="images/docker.PNG" alt="Parallel Training Dashboard" /> <figcaption> Figure 3: Docker Containers Dashboard
+</figcaption> </figure>
+
+
+
+
 | **Metric**                  | **Description**                                      | **Common Use Case**                                      |
 |-----------------------------|------------------------------------------------------|----------------------------------------------------------|
 | **CPU Usage**               | Measures CPU usage per container                     | Detect bottlenecks in compute-intensive processes.       |
@@ -265,7 +276,13 @@ In this machine learning platform, Prometheus gathers system metrics from multip
 
 
 #### Dashboard: Kafka Exporter Overview
-![System Architecture](images/kafka.png)
+
+<figure> <img src="images/kafka.PNG" alt="Parallel Training Dashboard" /> <figcaption> Figure 3: Kafka Exporter Dashboard
+</figcaption> </figure>
+
+
+
+
 | **Metric**                     | **Description**                                            | **Common Use Case**                                      |
 |--------------------------------|------------------------------------------------------------|----------------------------------------------------------|
 | **Messages per Minute**        | Tracks messages processed per minute                      | Monitor Kafka broker’s message flow trends and identify peak message throughput.                |
@@ -276,7 +293,11 @@ In this machine learning platform, Prometheus gathers system metrics from multip
 | **Consumer Lag**               | Tracks the difference between the latest produced message and the latest consumed message | Identify consumer lag and potential bottlenecks. |
 
  **Dashboard: Redis Exporter Overview**
-![System Architecture](images/redis.png)
+ <figure> <img src="images/redis.PNG" alt="Parallel Training Dashboard" /> <figcaption> Figure 4: Redis Exporter Dashboard
+</figcaption> </figure>
+
+
+
 
 
 | **Metric**                      | **Description**                                      | **Common Use Case**                                        |

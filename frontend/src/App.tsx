@@ -159,7 +159,7 @@ const App: React.FC = () => {
           <AppBar position="sticky" elevation={4}>
             <Toolbar>
               <Typography variant="h5" sx={{ flexGrow: 1 }}>
-                Machine Learning Dashboard
+              Distributed Machine Learning Training System 
               </Typography>
             </Toolbar>
           </AppBar>
