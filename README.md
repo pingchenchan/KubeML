@@ -150,6 +150,7 @@ Prometheus and Grafana monitor system health and resource usage, ensuring reliab
 ### Model Selection and Training Task Initiation
 Provides a user-friendly interface built with React for deep learning model selection and real-time log viewing.
 **Technology Stack:** ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=white&style=flat) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white&style=flat) ![MUI](https://img.shields.io/badge/MUI-007FFF?logo=mui&logoColor=white&style=flat)
+
 **Functionality:**
 - Users select models (MLP, CNN, LSTM) and initiate training.
 - Real-time logs are streamed via SSE to keep users informed.
@@ -157,6 +158,7 @@ Provides a user-friendly interface built with React for deep learning model sele
 
 ### Task Coordination and Orchestration
  The master node receives user requests, stores data in Cassandra, and distributes tasks to worker nodes through Kafka.
+
 **Technology Stack:** ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white&style=flat) ![Cassandra](https://img.shields.io/badge/Cassandra-1287B1?logo=apache-cassandra&logoColor=white&style=flat) ![Kafka](https://img.shields.io/badge/Kafka-231F20?logo=apache-kafka&logoColor=white&style=flat)
 
 **Process:**
@@ -169,6 +171,7 @@ Provides a user-friendly interface built with React for deep learning model sele
 
 ### Task Distribution and Real-time Logging
 Kafka handles task distribution between the master and worker nodes and provides real-time log streaming to the frontend.
+
 **Technology Stack:** ![Kafka](https://img.shields.io/badge/Kafka-231F20?logo=apache-kafka&logoColor=white&style=flat)
 
 **Process:**
@@ -196,6 +199,7 @@ Kafka handles task distribution between the master and worker nodes and provides
 
 ### Parallel Model Training:
 Worker nodes retrieve tasks from Kafka, access data from Cassandra or Redis, and perform model training in parallel.
+
 **Technology Stack:** ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white&style=flat) ![TensorFlow](https://img.shields.io/badge/TensorFlow-FF6F00?logo=tensorflow&logoColor=white&style=flat) ![Kafka](https://img.shields.io/badge/Kafka-231F20?logo=apache-kafka&logoColor=white&style=flat) ![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white&style=flat)
 
 **Process:**
@@ -209,6 +213,7 @@ Worker nodes retrieve tasks from Kafka, access data from Cassandra or Redis, and
 
 ### In-memory Caching Layer
 Redis stores frequently accessed datasets, reducing the load on Cassandra and improving data retrieval times.
+
 **Technology Stack:** ![Redis](https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white&style=flat)
 
 **Process:**
@@ -220,6 +225,7 @@ Redis stores frequently accessed datasets, reducing the load on Cassandra and im
 
 ### System Monitoring and Visualization
 Prometheus collects system metrics, and Grafana visualizes resource usage and training progress.
+
 **Technology Stack:** ![Prometheus](https://img.shields.io/badge/Prometheus-E6522C?logo=prometheus&logoColor=white&style=flat) ![Grafana](https://img.shields.io/badge/Grafana-F46800?logo=grafana&logoColor=white&style=flat)
 
 **Process:**
