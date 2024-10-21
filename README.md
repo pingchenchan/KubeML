@@ -8,7 +8,6 @@
   - [Architecture Introduction](#architecture-introduction)
   - [System Flow](#system-flow)
       - [Summary of Component Roles in the Flow](#summary-of-component-roles-in-the-flow)
-  - [This flow ensures scalability, real-time feedback, and fault tolerance, allowing multiple worker nodes to operate in parallel while monitoring system health and resource usage effectively.](#this-flow-ensures-scalability-real-time-feedback-and-fault-tolerance-allowing-multiple-worker-nodes-to-operate-in-parallel-while-monitoring-system-health-and-resource-usage-effectively)
   - [Setup: Running the System with docker-compose](#setup-running-the-system-with-docker-compose)
   - [Design Considerations](#design-considerations)
       - [Parallel Model Training for Scalability](#parallel-model-training-for-scalability)
@@ -47,7 +46,6 @@
 
 This platform provides parallel machine learning training services with real-time feedback. It focuses on training deep learning models on the MNIST dataset using three common architectures: MLP, CNN, and LSTM. The system distributes workloads across multiple worker nodes and streams real-time logs to the frontend, offering users immediate insight into the training process.
 
----
 
 ## Architecture Introduction
 
@@ -110,6 +108,7 @@ This section outlines the detailed flow of the entire machine learning training 
 
 
 This flow ensures scalability, real-time feedback, and fault tolerance, allowing multiple worker nodes to operate in parallel while monitoring system health and resource usage effectively.
+
 ---
 
 
