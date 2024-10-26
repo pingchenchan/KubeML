@@ -1,13 +1,20 @@
 from fastapi import HTTPException
 import logging
 import pickle
-import redis
-
+from redis import Redis
+from redis.cluster import RedisCluster 
+from redis.cluster import ClusterNode
 from settings import REDIS_HOST
-##  Redis connection
 
-
-redis_client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=False)
+nodes = [ClusterNode('redis-node1', 6379), ClusterNode('redis-node2', 6380), ClusterNode('redis-node3', 6381), ClusterNode('redis-node4', 6382), ClusterNode('redis-node5', 6383), ClusterNode('redis-node6', 6384)]
+try:
+    redis_client = RedisCluster(
+        startup_nodes=nodes,
+    )
+    logging.info("Successfully connected to Redis Cluster.")
+except Exception as e:
+    logging.error(f"Cannot connect to Redis Cluster: {e}")
+    raise HTTPException(status_code=500, detail="Redis Cluster connection failed.")
 
 
 def cache_to_redis(key, value):

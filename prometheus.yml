@@ -26,3 +26,6 @@ scrape_configs:
   - job_name: 'docker'
     static_configs:
       - targets: ['cadvisor:8080']
+  # - job_name: 'cassandra'
+  #   static_configs:
+  #     - targets: ['cassandra-exporter:8081'] 

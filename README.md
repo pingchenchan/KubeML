@@ -129,7 +129,17 @@ docker-compose up --build
 
 This command ensures that each container is built from the specified Dockerfiles and started in the correct order, following the dependencies defined in the docker-compose.yml file.
 
+To confirm that the Redis Cluster is running successfully and is available, you can follow the steps below:
+```bash
+docker exec -it redis-node1 redis-cli -c cluster info
+docker exec -it redis-node1 redis-cli -c cluster nodes
+```
 
+
+To troubleshoot network connectivity, you can use the following command:
+```bash
+ docker network inspect  kubeml_my_network
+```
 ## Design Considerations
 
 This system is designed to address key scenarios:

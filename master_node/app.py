@@ -189,3 +189,6 @@ async def fetch_mnist_data_from_cassandra():
         return {"status": "Data fetched from Cassandra", "cached": False}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch data: {e}")
+    
+    
+    
