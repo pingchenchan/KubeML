@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI, HTTPException
 from kafka_utils import start_kafka_consumer, send_to_kafka
 from fastapi.middleware.cors import CORSMiddleware
-from redis_utils import redis_client
+from redis_utils import cache_to_redis, get_from_redis, redis_client
 
 # Configure logging
 logging.basicConfig(
@@ -47,3 +47,24 @@ async def test_send_training_log():
         return {"status": "Message sent"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send message: {e}")
+    
+    
+@app.post("/cache_to_redis/{key}")
+async def cache_data_to_redis(key: str, value: dict):
+    try:
+        cache_to_redis(key, value)
+        return {"status": "Data cached successfully", "key": key, "value": value}
+    except Exception as e:
+        logging.error(f"Failed to cache data: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to cache data: {e}")
+
+@app.get("/get_from_redis/{key}")
+async def get_data_from_redis(key: str):
+    try:
+        value = get_from_redis(key)
+        return {"status": "Data fetched successfully", "key": key, "value": value}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logging.error(f"Failed to fetch data: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch data: {e}")

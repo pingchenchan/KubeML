@@ -190,4 +190,23 @@ async def fetch_mnist_data_from_cassandra():
         raise HTTPException(status_code=500, detail=f"Failed to fetch data: {e}")
     
     
-    
+
+@app.post("/cache_to_redis/{key}")
+async def cache_data_to_redis(key: str, value: dict):
+    try:
+        cache_to_redis(key, value)
+        return {"status": "Data cached successfully", "key": key, "value": value}
+    except Exception as e:
+        logging.error(f"Failed to cache data: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to cache data: {e}")
+
+@app.get("/get_from_redis/{key}")
+async def get_data_from_redis(key: str):
+    try:
+        value = get_from_redis(key)
+        return {"status": "Data fetched successfully", "key": key, "value": value}
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logging.error(f"Failed to fetch data: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch data: {e}")
