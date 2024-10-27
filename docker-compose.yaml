@@ -93,11 +93,14 @@ services:
     container_name: prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus 
+      # - prometheus-data:/prometheus 
     ports:
       - "9090:9090"
     networks:
       - my_network
+    depends_on:
+      - cassandra-node1
+      - cassandra-node2
 
   grafana:
     image: grafana/grafana:latest
@@ -111,13 +114,17 @@ services:
     depends_on:
       - prometheus
 
+  
   cassandra-node1:
     image: cassandra:latest
     container_name: cassandra-node1
     ports:
-      - "9042:9042"
+      - "9042:9042" 
+      - "7070:7070" 
     volumes:
       - cassandra_data_node1:/var/lib/cassandra
+      - ./cassandra-config/jmx_prometheus_javaagent.jar:/opt/jmx_prometheus_javaagent.jar
+      - ./cassandra-config/cassandra.yml:/opt/cassandra.yml
     networks:
       - my_network
     environment:
@@ -125,27 +132,31 @@ services:
       - CASSANDRA_CLUSTER_NAME=my_cluster
       - CASSANDRA_DC=dc1
       - CASSANDRA_RACK=rack1
+      - JVM_OPTS=-javaagent:/opt/jmx_prometheus_javaagent.jar=7070:/opt/cassandra.yml
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-
   cassandra-node2:
     image: cassandra:latest
     container_name: cassandra-node2
     ports:
-      - "9142:9042"
+      - "9142:9042"  
+      - "7071:7070" 
     volumes:
       - cassandra_data_node2:/var/lib/cassandra
+      - ./cassandra-config/jmx_prometheus_javaagent.jar:/opt/jmx_prometheus_javaagent.jar
+      - ./cassandra-config/cassandra.yml:/opt/cassandra.yml
     networks:
       - my_network
     environment:
       - CASSANDRA_SEEDS=cassandra-node1,cassandra-node2
       - CASSANDRA_CLUSTER_NAME=my_cluster
       - CASSANDRA_DC=dc1
-      - CASSANDRA_RACK=rack1
+      - CASSANDRA_RACK=rack2
+      - JVM_OPTS=-javaagent:/opt/jmx_prometheus_javaagent.jar=7071:/opt/cassandra.yml
     healthcheck:
       test: ["CMD-SHELL", "cqlsh -e 'describe keyspaces'"]
       interval: 10s
@@ -164,6 +175,12 @@ services:
       - 'REDIS_NODES=redis-node1 redis-node2 redis-node3 redis-node4 redis-node5 redis-node6'
     networks:
       - my_network
+    #add healthcheck
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
       
   redis-node2:
     container_name: redis-node2
@@ -247,7 +264,7 @@ services:
     environment:
       - CASSANDRA_HOST=cassandra-node1,cassandra-node2
       - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093,kafka-node3:9094
-      - REDIS_HOST=redis-node1
+      - REDIS_HOSTS=redis-node1,redis-node2,redis-node3,redis-node4,redis-node5,redis-node6
     volumes:
       - ./master_node:/app
     depends_on:
@@ -259,6 +276,13 @@ services:
       #   condition: service_healthy
     networks:
       - my_network
+    #add healthcheck
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 10s   
+      retries: 3 
+
 
 
   worker_node1:
@@ -269,15 +293,17 @@ services:
     depends_on:
       kafka-node1:
         condition: service_healthy
-      # redis-node1:
-      #   condition: service_healthy
+      redis-node1:
+        condition: service_healthy
+      master_node:
+        condition: service_healthy
     ports:
       - "8000:8000"
     networks:
       - my_network
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093,kafka-node3:9094
-      - REDIS_HOST=redis-node-0:6379
+      - REDIS_HOSTS=redis-node1,redis-node2,redis-node3,redis-node4,redis-node5,redis-node6
       - WORKER_ID=worker-1
       - PORT=8000
     volumes:
@@ -292,15 +318,17 @@ services:
     depends_on:
       kafka-node1:
         condition: service_healthy
-      # redis-node1:
-      #   condition: service_healthy
+      redis-node1:
+        condition: service_healthy
+      master_node:
+        condition: service_healthy
     ports:
       - "9001:9001"
     networks:
       - my_network
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093,kafka-node3:9094
-      - REDIS_HOST=REDIS_HOST=redis-node1:6379
+      - REDIS_HOSTS=redis-node1,redis-node2,redis-node3,redis-node4,redis-node5,redis-node6
       - WORKER_ID=worker-2
       - PORT=9001
     volumes:
@@ -327,10 +355,16 @@ services:
       - "9121:9121"
     environment:
       - REDIS_ADDR=redis-node1:6379
+      - REDIS_EXPORTER_USE_CLUSTERMODE=true
     networks:
       - my_network
     depends_on:
       - redis-node1
+      - redis-node2
+      - redis-node3
+      - redis-node4
+      - redis-node5
+      - redis-node6
         # condition: service_healthy
 
 
@@ -365,7 +399,7 @@ services:
 volumes:
   cassandra_data_node1:
   cassandra_data_node2:
-  prometheus-data: 
+  # prometheus-data: 
   grafana-data: 
   redis-node1:
   redis-node2:
@@ -378,4 +412,33 @@ volumes:
 networks:
   my_network:
     driver: bridge
+
+
+
+# ##################################
+
+
+
+#   prometheus:
+#     image: prom/prometheus:latest
+#     container_name: prometheus
+#     ports:
+#       - "9090:9090"
+#     volumes:
+#       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+#     networks:
+#       - my_network
+#     depends_on:
+#       - cassandra-node1
+#       - cassandra-node2
+
+#   grafana:
+#     image: grafana/grafana:latest
+#     container_name: grafana
+#     ports:
+#       - "3000:3000"
+#     networks:
+#       - my_network
+#     depends_on:
+#       - prometheus
 

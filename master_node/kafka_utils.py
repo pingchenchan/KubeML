@@ -10,6 +10,7 @@ from settings import KAFKA_SERVER
 
 def create_kafka_topics():
     admin_client = AdminClient({'bootstrap.servers': ','.join(KAFKA_SERVER)})
+    logging.info("Creating Kafka topics, servers are: " + ','.join(KAFKA_SERVER))
 
     topics = [
         {'name': 'task', 'partitions': 3, 'replication_factor': 3},
@@ -17,8 +18,14 @@ def create_kafka_topics():
         {'name': 'load_data', 'partitions': 2, 'replication_factor': 1}
     ]
     
-    existing_topics = admin_client.list_topics().topics
-
+    try:
+        # Fetch existing topics to avoid recreating them
+        existing_topics = admin_client.list_topics(timeout=10).topics
+        print(f"Existing topics: {list(existing_topics.keys())}")
+    except Exception as e:
+        print(f"Error fetching existing topics: {e}")
+        return  # Exit if Kafka connection fails
+    
     new_topics = [
         NewTopic(topic['name'], 
                  num_partitions=topic['partitions'], 

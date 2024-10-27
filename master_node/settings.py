@@ -1,6 +1,6 @@
 import os
 
-REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')
+REDIS_HOSTS = os.getenv('REDIS_HOSTS', 'localhost').split(',')
 CASSANDRA_HOSTS = os.getenv('CASSANDRA_HOST', 'localhost').split(',')
 CASSANDRA_KEYSPACE = 'my_dataset_keyspace'
 KAFKA_SERVER = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092').split(',')

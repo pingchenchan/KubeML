@@ -1,5 +1,6 @@
 global:
   scrape_interval: 5s  
+  evaluation_interval: 5s
 
 scrape_configs:
   - job_name: 'kafka'
@@ -9,7 +10,12 @@ scrape_configs:
   - job_name: 'redis_exporter_targets'
     static_configs:
       - targets:
-        - redis://redis:6379
+        - redis-node1:6379
+        - redis-node2:6379
+        - redis-node3:6379
+        - redis-node4:6379
+        - redis-node5:6379
+        - redis-node6:6379
     metrics_path: /scrape
     relabel_configs:
       - source_labels: [__address__]
@@ -26,6 +32,10 @@ scrape_configs:
   - job_name: 'docker'
     static_configs:
       - targets: ['cadvisor:8080']
-  # - job_name: 'cassandra'
-  #   static_configs:
-  #     - targets: ['cassandra-exporter:8081'] 
+
+
+  - job_name: 'cassandra'
+    static_configs:
+      - targets:
+          - cassandra-node1:7070
+          - cassandra-node2:7071

@@ -1,10 +1,23 @@
 import logging
 import pickle
-import redis
+from redis.cluster import RedisCluster 
+from redis.cluster import ClusterNode
 import os
-from settings import REDIS_HOST
+from settings import REDIS_HOSTS
+
 ##  Redis connection
-redis_client = redis.Redis(host=REDIS_HOST, port=6379, decode_responses=False)
+nodes = [
+    ClusterNode(host.strip(), 6379 + idx) 
+    for idx, host in enumerate(REDIS_HOSTS)
+]
+try:
+    redis_client = RedisCluster(
+        startup_nodes=nodes,
+    )
+    logging.info("Successfully connected to Redis Cluster.")
+except Exception as e:
+    logging.error(f"Cannot connect to Redis Cluster: {e}")
+    raise HTTPException(status_code=500, detail="Redis Cluster connection failed.")
 
 def cache_to_redis(key, value):
     redis_client.set(key,  pickle.dumps(value))

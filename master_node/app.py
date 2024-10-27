@@ -46,7 +46,6 @@ def event_stream():
 
 @app.get("/logs/stream")
 async def get_logs():
-    """SSE 端點，持續發送 Kafka 消息給前端"""
     async def event_stream():
         while True:
             message = await message_queue.get()

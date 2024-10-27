@@ -1,12 +1,14 @@
 from fastapi import HTTPException
 import logging
 import pickle
-from redis import Redis
 from redis.cluster import RedisCluster 
 from redis.cluster import ClusterNode
-from settings import REDIS_HOST
+from settings import REDIS_HOSTS
 
-nodes = [ClusterNode('redis-node1', 6379), ClusterNode('redis-node2', 6380), ClusterNode('redis-node3', 6381), ClusterNode('redis-node4', 6382), ClusterNode('redis-node5', 6383), ClusterNode('redis-node6', 6384)]
+nodes = [
+    ClusterNode(host.strip(), 6379 + idx) 
+    for idx, host in enumerate(REDIS_HOSTS)
+]
 try:
     redis_client = RedisCluster(
         startup_nodes=nodes,

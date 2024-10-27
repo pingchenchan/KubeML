@@ -124,7 +124,7 @@ This flow ensures scalability, real-time feedback, and fault tolerance, allowing
 To deploy the entire machine learning platform, use the following command to build and start all services:
 
 ```bash
-docker-compose up --build
+docker-compose down; docker-compose up --build
 ```
 
 This command ensures that each container is built from the specified Dockerfiles and started in the correct order, following the dependencies defined in the docker-compose.yml file.
@@ -140,6 +140,12 @@ To troubleshoot network connectivity, you can use the following command:
 ```bash
  docker network inspect  kubeml_my_network
 ```
+
+Some references
+[monitoring-cassandra-with-prometheus](https://www.robustperception.io/monitoring-cassandra-with-prometheus/)
+
+
+
 ## Design Considerations
 
 This system is designed to address key scenarios:
