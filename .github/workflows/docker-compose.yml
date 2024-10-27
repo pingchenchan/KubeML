@@ -24,8 +24,11 @@ jobs:
       - name: Build and Run Docker Compose
         run: 
             docker-compose up -d
+     
+      - name: Wait for Services to Stabilize
+        run: |
             echo "Waiting 30 seconds for services to stabilize..."
-            sleep 30  # 延遲 30 秒
+            sleep 30
 
       - name: Check Master Node Health
         run: |
