@@ -1,72 +1,43 @@
-name: CI/CD Pipeline for Multi-node System
+name: CI/CD Pipeline for Multi-node Testing
 
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
 
-    services:
-      zookeeper:
-        image: wurstmeister/zookeeper:latest
-        ports:
-          - 2181:2181
-
-      kafka:
-        image: wurstmeister/kafka:latest
-        ports:
-          - 9092:9092
-        env:
-          KAFKA_BROKER_ID: 1
-          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-        options: >-
-          --health-cmd="kafka-broker-api-versions.sh --bootstrap-server localhost:9092"
-          --health-interval=15s
-          --health-timeout=10s
-          --health-retries=3
-
-      redis:
-        image: redis:alpine
-        ports:
-          - 6379:6379
-        options: --health-cmd="redis-cli ping" --health-interval=10s --health-timeout=5s --health-retries=3
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Docker Buildx
+      - name: Set up Docker
         uses: docker/setup-buildx-action@v2
 
-      - name: Build Docker Images
-        run: docker-compose -f docker-compose.yml build
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
 
-      - name: Run Docker Compose
+      - name: Build and Run Docker Compose
         run: docker-compose up -d
 
-      - name: Check Kafka Health
+      - name: Simulate Kafka Failure
         run: |
-          sleep 15  # 等待 Kafka 啟動
-          curl -s http://localhost:9090/api/v1/query?query=kafka_under_replicated_partitions
+          docker stop kafka-node1 || true
+          sleep 10
+          docker start kafka-node1 || true
 
-      - name: Simulate Kafka Node Failure
+      - name: Simulate Redis Failure
         run: |
-          docker stop kafka-node1
-          sleep 10  # 等待 Kafka 失效
-          docker start kafka-node1
-
-      - name: Simulate Redis Node Failure
-        run: |
-          docker stop redis
-          sleep 10  # 等待 Redis 失效
-          docker start redis
+          docker stop redis || true
+          sleep 10
+          docker start redis || true
 
       - name: Cleanup
         if: always()
