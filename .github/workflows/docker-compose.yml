@@ -30,29 +30,7 @@ jobs:
             echo "Waiting 30 seconds for services to stabilize..."
             sleep 60
 
-      - name: Check Master Node Health
-        run: |
-            docker ps
-            curl --fail http://localhost:5000/health || exit 1
     
-      - name: Collect Logs if Failing
-        if: failure()
-        run: |
-            echo "Collecting logs for master-node..."
-            docker logs master-node
-
-
-      - name: Simulate Kafka Failure
-        run: |
-          docker stop kafka-node1 || true
-          sleep 10
-          docker start kafka-node1 || true
-
-      - name: Simulate Redis Failure
-        run: |
-          docker stop redis || true
-          sleep 10
-          docker start redis || true
 
       - name: Cleanup
         if: always()

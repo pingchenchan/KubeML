@@ -141,6 +141,10 @@ To troubleshoot network connectivity, you can use the following command:
  docker network inspect  kubeml_my_network
 ```
 
+Get jenkins Admin Password, run following password in powersell.
+```bash
+docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+```
 Some references
 [monitoring-cassandra-with-prometheus](https://www.robustperception.io/monitoring-cassandra-with-prometheus/)
 
