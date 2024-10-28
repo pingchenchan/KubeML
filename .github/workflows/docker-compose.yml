@@ -28,13 +28,13 @@ jobs:
       - name: Wait for Services to Stabilize
         run: |
             echo "Waiting 30 seconds for services to stabilize..."
-            sleep 30
+            sleep 60
 
       - name: Check Master Node Health
         run: |
             docker ps
             curl --fail http://localhost:5000/health || exit 1
-
+    
       - name: Collect Logs if Failing
         if: failure()
         run: |
