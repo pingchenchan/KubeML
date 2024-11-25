@@ -1,4 +1,4 @@
-version: '3.8'
+
 services:
   zookeeper:
     image: wurstmeister/zookeeper:latest
@@ -163,97 +163,18 @@ services:
       timeout: 5s
       retries: 5
 
-  redis-node1:
-    container_name: redis-node1
-    image: docker.io/bitnami/redis-cluster:7.4
+  redis:
+    image: "redis:alpine"
+    container_name: redis
     ports:
       - "6379:6379"
-    volumes:
-      - redis-node1:/bitnami/redis/data
-    environment:
-      - 'ALLOW_EMPTY_PASSWORD=yes'
-      - 'REDIS_NODES=redis-node1 redis-node2 redis-node3 redis-node4 redis-node5 redis-node6'
     networks:
       - my_network
-    #add healthcheck
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      
-  redis-node2:
-    container_name: redis-node2
-    image: docker.io/bitnami/redis-cluster:7.4
-    ports:
-      - "6380:6379"
-    volumes:
-      - redis-node2:/bitnami/redis/data
-    environment:
-      - 'ALLOW_EMPTY_PASSWORD=yes'
-      - 'REDIS_NODES=redis-node1 redis-node2 redis-node3 redis-node4 redis-node5 redis-node6'
-    networks:
-      - my_network
-
-  redis-node3:
-    container_name: redis-node3
-    image: docker.io/bitnami/redis-cluster:7.4
-    ports:
-      - "6381:6379"
-    volumes:
-      - redis-node3:/bitnami/redis/data
-    environment:
-      - 'ALLOW_EMPTY_PASSWORD=yes'
-      - 'REDIS_NODES=redis-node1 redis-node2 redis-node3 redis-node4 redis-node5 redis-node6'
-    networks:
-      - my_network
-      
-  redis-node4:
-    container_name: redis-node4
-    image: docker.io/bitnami/redis-cluster:7.4
-    ports:
-      - "6382:6379"
-    volumes:
-      - redis-node4:/bitnami/redis/data
-    environment:
-      - 'ALLOW_EMPTY_PASSWORD=yes'
-      - 'REDIS_NODES=redis-node1 redis-node2 redis-node3 redis-node4 redis-node5 redis-node6'
-    networks:
-      - my_network
-
-  redis-node5:
-    container_name: redis-node5
-    image: docker.io/bitnami/redis-cluster:7.4
-    ports:
-      - "6383:6379"
-    volumes:
-      - redis-node5:/bitnami/redis/data
-    environment:
-      - 'ALLOW_EMPTY_PASSWORD=yes'
-      - 'REDIS_NODES=redis-node1 redis-node2 redis-node3 redis-node4 redis-node5 redis-node6'
-    networks:
-      - my_network
-
-  redis-node6:
-    container_name: redis-node6
-    image: docker.io/bitnami/redis-cluster:7.4
-    ports:
-      - "6384:6379"
-    volumes:
-      - redis-node6:/bitnami/redis/data
-    depends_on:
-      - redis-node1
-      - redis-node2
-      - redis-node3
-      - redis-node4
-      - redis-node5
-    environment:
-      - 'ALLOW_EMPTY_PASSWORD=yes'
-      - 'REDIS_CLUSTER_REPLICAS=1'
-      - 'REDIS_NODES=redis-node1 redis-node2 redis-node3 redis-node4 redis-node5 redis-node6'
-      - 'REDIS_CLUSTER_CREATOR=yes'
-    networks:
-      - my_network
+        test: ["CMD", "redis-cli", "ping"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
 
 
   master_node:
@@ -264,7 +185,7 @@ services:
     environment:
       - CASSANDRA_HOST=cassandra-node1,cassandra-node2
       - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093,kafka-node3:9094
-      - REDIS_HOSTS=redis-node1,redis-node2,redis-node3,redis-node4,redis-node5,redis-node6
+      - REDIS_HOST=redis
     volumes:
       - ./master_node:/app
     depends_on:
@@ -272,8 +193,8 @@ services:
         condition: service_healthy
       cassandra-node1:
         condition: service_healthy
-      # redis-node1:
-      #   condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - my_network
     #add healthcheck
@@ -295,7 +216,7 @@ services:
     depends_on:
       kafka-node1:
         condition: service_healthy
-      redis-node1:
+      redis:
         condition: service_healthy
       master_node:
         condition: service_healthy
@@ -305,7 +226,7 @@ services:
       - my_network
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093,kafka-node3:9094
-      - REDIS_HOSTS=redis-node1,redis-node2,redis-node3,redis-node4,redis-node5,redis-node6
+      - REDIS_HOST=redis
       - WORKER_ID=worker-1
       - PORT=8000
     volumes:
@@ -320,7 +241,7 @@ services:
     depends_on:
       kafka-node1:
         condition: service_healthy
-      redis-node1:
+      redis:
         condition: service_healthy
       master_node:
         condition: service_healthy
@@ -330,7 +251,7 @@ services:
       - my_network
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka-node1:9092,kafka-node2:9093,kafka-node3:9094
-      - REDIS_HOSTS=redis-node1,redis-node2,redis-node3,redis-node4,redis-node5,redis-node6
+      - REDIS_HOST=redis
       - WORKER_ID=worker-2
       - PORT=9001
     volumes:
@@ -356,18 +277,11 @@ services:
     ports:
       - "9121:9121"
     environment:
-      - REDIS_ADDR=redis-node1:6379
-      - REDIS_EXPORTER_USE_CLUSTERMODE=true
+      - REDIS_ADDR=redis:6379
     networks:
       - my_network
     depends_on:
-      - redis-node1
-      - redis-node2
-      - redis-node3
-      - redis-node4
-      - redis-node5
-      - redis-node6
-        # condition: service_healthy
+      - redis
 
 
   kafka-exporter:
@@ -404,13 +318,6 @@ volumes:
   cassandra_data_node2:
   # prometheus-data: 
   grafana-data: 
-  redis-node1:
-  redis-node2:
-  redis-node3:
-  redis-node4:
-  redis-node5:
-  redis-node6:
-
 
 
 networks:

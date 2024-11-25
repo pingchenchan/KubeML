@@ -10,12 +10,7 @@ scrape_configs:
   - job_name: 'redis_exporter_targets'
     static_configs:
       - targets:
-        - redis-node1:6379
-        - redis-node2:6379
-        - redis-node3:6379
-        - redis-node4:6379
-        - redis-node5:6379
-        - redis-node6:6379
+        - redis://redis:6379
     metrics_path: /scrape
     relabel_configs:
       - source_labels: [__address__]
